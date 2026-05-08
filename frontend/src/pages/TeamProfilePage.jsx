@@ -1,7 +1,7 @@
 import { Navigate, useParams } from 'react-router-dom'
 import { Crest, FormPills, PageTrail, PlayerBadge, StatChip, Widget } from '../components/ui'
 import { getTeamById, listMatchesByTeamId, listPlayersByTeamId, listTournaments } from '../data/repository'
-import { getRatingToneClass } from '../lib/rating'
+import { getRatingToneClass } from '../utils/rating'
 
 export function TeamProfilePage() {
   const { teamId } = useParams()

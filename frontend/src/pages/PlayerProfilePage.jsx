@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { PageTrail, StatChip, TeamInlineLink, Widget } from '../components/ui'
 import { getPlayerById, getPlayerPerformance, listPlayerMatchLogs } from '../data/repository'
-import { getRatingToneClass } from '../lib/rating'
+import { getRatingToneClass } from '../utils/rating'
 
 export function PlayerProfilePage() {
   const { playerId } = useParams()

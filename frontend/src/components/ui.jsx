@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { getPlayerById, getTeamById, getTeamName } from '../data/repository'
-import { getRatingToneClass } from '../lib/rating'
+import { getRatingToneClass } from '../utils/rating'
 
 export function PageIntro({ eyebrow, title, description, aside }) {
   return (
