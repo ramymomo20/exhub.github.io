@@ -268,16 +268,7 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
                 <strong>{entry.role}</strong>
               </div>
               <span className="pitch-player-name">{player?.name ?? entry.player ?? entry.playerId}</span>
-              {entry.badges?.length ? (
-                <div className="pitch-badges">
-                  {entry.badges.map((badge) => (
-                    <span key={`${badge.type}-${badge.count}`} className={`event-badge event-${badge.type}`}>
-                      <EventIcon type={badge.type} />
-                      {badge.count > 0 ? <small>{badge.count}</small> : null}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+              <PitchStatChips badges={entry.badges} />
               {tooltipLines.length ? (
                 <div className="pitch-tooltip">
                   {tooltipLines.map((line) => (
@@ -391,6 +382,25 @@ function getMatchRatingClass(rating, badges = []) {
   if (rating >= 7.5) return 'rating-good'
   if (rating >= 6) return 'rating-mid'
   return 'rating-bad'
+}
+
+function PitchStatChips({ badges = [] }) {
+  const visible = badges.filter((badge) => ['goal', 'save', 'yellow-card', 'red-card', 'own-goal', 'assist'].includes(badge.type) && badge.count > 0)
+
+  if (!visible.length) {
+    return null
+  }
+
+  return (
+    <div className="pitch-player-stats">
+      {visible.map((badge) => (
+        <span key={`${badge.type}-${badge.count}`} className="pitch-stat-chip">
+          <EventIcon type={badge.type} />
+          <em>{badge.count}</em>
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function getRatingTierClass(rating) {
