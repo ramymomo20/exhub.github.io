@@ -76,8 +76,10 @@ export function RankingsPage() {
             {[...teams].sort((a, b) => b.avgRating - a.avgRating).map((team, index) => (
               <article key={team.id} className="ranking-item ranking-item-rich">
                 <strong>#{index + 1}</strong>
-                <TeamInlineLink teamId={team.id} />
-                <FormPills values={team.form} />
+                <div className="ranking-team-block">
+                  <TeamInlineLink teamId={team.id} />
+                  <FormPills values={team.form} />
+                </div>
                 <b>{team.avgRating.toFixed(1)}</b>
               </article>
             ))}

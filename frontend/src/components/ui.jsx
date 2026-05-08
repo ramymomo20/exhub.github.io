@@ -255,6 +255,7 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
         {items.map((entry, index) => {
           const player = entry.playerId ? getPlayerById(entry.playerId) : null
           const tooltipLines = entry.playerId ? (tooltips[entry.playerId] ?? []) : []
+          const ratingClass = getMatchRatingClass(entry.rating, entry.badges)
 
           return (
             <div
@@ -262,7 +263,7 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
               className={`pitch-marker ${entry.badges?.some((badge) => badge.type === 'mvp') ? 'is-mvp' : ''}`}
               style={{ left: `${entry.x}%`, top: `${entry.y}%` }}
             >
-              {entry.rating ? <span className="pitch-rating">{entry.rating}</span> : null}
+              {entry.rating ? <span className={`pitch-rating ${ratingClass}`}>{entry.rating}</span> : null}
               <div className="pitch-shirt">
                 <strong>{entry.role}</strong>
               </div>
@@ -382,6 +383,14 @@ function mapLineupToFormation(items, format) {
 
 function normalizeRole(role) {
   return String(role ?? '').trim().toUpperCase()
+}
+
+function getMatchRatingClass(rating, badges = []) {
+  if (badges.some((badge) => badge.type === 'mvp')) return 'rating-mvp'
+  if (typeof rating !== 'number') return 'rating-neutral'
+  if (rating >= 7.5) return 'rating-good'
+  if (rating >= 6) return 'rating-mid'
+  return 'rating-bad'
 }
 
 function getRatingTierClass(rating) {

@@ -40,7 +40,6 @@ export function TournamentDetailPage() {
                   <tr>
                     <th>#</th>
                     <th>Team</th>
-                    <th>Form</th>
                     <th>MP</th>
                     <th>W</th>
                     <th>D</th>
@@ -58,9 +57,9 @@ export function TournamentDetailPage() {
                       <td>
                         <div className="standings-team-cell">
                           <TeamInlineLink teamId={row.teamId} compact />
+                          <FormPills values={row.form} />
                         </div>
                       </td>
-                      <td><FormPills values={row.form} /></td>
                       <td>{row.played}</td>
                       <td>{row.wins}</td>
                       <td>{row.draws}</td>

@@ -19,11 +19,6 @@ export function MatchDetailPage() {
       <PageTrail items={[{ label: 'Home', to: '/' }, { label: 'Matches', to: '/matches' }, { label: `${homeTeam?.shortName} vs ${awayTeam?.shortName}` }]} />
 
       <section className="match-hero card match-hero-expanded">
-        <div className="match-hero-meta-line">
-          <span>{match.date}</span>
-          <span>{match.time}</span>
-        </div>
-
         <div className="match-hero-grid">
           <div className="hero-side hero-side-left">
             <div className="hero-team-block">
@@ -39,7 +34,6 @@ export function MatchDetailPage() {
               <PlayerInlineLink playerId={mvp?.id} compact />
             </div>
             <h1>{match.homeScore} : {match.awayScore}</h1>
-            <small className="format-pill-large">{match.format}</small>
           </div>
 
           <div className="hero-side hero-side-right">
@@ -49,19 +43,33 @@ export function MatchDetailPage() {
             <EventStack title="" entries={match.awayEventStack} />
           </div>
         </div>
+
+        <div className="match-hero-bottom-row">
+          <div className="match-card-flags">
+            {match.flags.map((flag) => (
+              <span key={flag} className="flag-pill">{flag}</span>
+            ))}
+            <span className={`status-pill ${match.status.toLowerCase().includes('live') ? 'is-live' : ''}`}>{match.status}</span>
+          </div>
+          <small className="format-pill-large">{match.format}</small>
+          <div className="match-hero-datetime">
+            <span>{match.date}</span>
+            <strong>{match.time}</strong>
+          </div>
+        </div>
       </section>
 
       <section className="dashboard-grid match-detail-layout">
         <Widget title="Lineups" className="span-two lineups-main-widget">
           <div className="lineups-grid">
-            <div>
-              <div className="lineup-header">
+            <div className="lineup-team-card">
+              <div className="lineup-team-header">
                 <TeamInlineLink teamId={homeTeam.id} />
               </div>
               <Pitch mode="match" format={match.format} lineups={match.lineups.home} tooltips={match.lineupTooltips} />
             </div>
-            <div>
-              <div className="lineup-header">
+            <div className="lineup-team-card">
+              <div className="lineup-team-header">
                 <TeamInlineLink teamId={awayTeam.id} />
               </div>
               <Pitch mode="match" format={match.format} lineups={match.lineups.away} tooltips={match.lineupTooltips} />
@@ -129,18 +137,25 @@ export function MatchDetailPage() {
 }
 
 function EventStack({ entries }) {
+  const filteredEntries = entries
+    .map((entry) => {
+      const grouped = groupKeyEvents(entry.events)
+      return grouped.length ? { ...entry, grouped } : null
+    })
+    .filter(Boolean)
+
   return (
     <div className="event-stack">
-      {entries.map((entry) => (
-        <div key={`${entry.playerName}-${entry.events[0]?.minute}`} className="event-stack-row">
+      {filteredEntries.map((entry) => (
+        <div key={`${entry.playerName}-${entry.grouped[0]?.type}-${entry.grouped[0]?.minutes}`} className="event-stack-row">
           <div className="event-stack-player">
             <strong>{entry.playerName}</strong>
           </div>
           <div className="event-stack-events">
-            {entry.events.map((event) => (
-              <span key={`${entry.playerName}-${event.minute}-${event.type}`} className="event-stack-badge">
-                <EventIcon type={event.type} />
-                <small>{event.minute}&apos;</small>
+            {entry.grouped.map((group) => (
+              <span key={`${entry.playerName}-${group.type}-${group.minutes}`} className="event-stack-badge">
+                <EventIcon type={group.type} />
+                <small>{group.minutes}&apos;</small>
               </span>
             ))}
           </div>
@@ -148,4 +163,22 @@ function EventStack({ entries }) {
       ))}
     </div>
   )
+}
+
+function groupKeyEvents(events = []) {
+  const allowed = ['goal', 'own-goal', 'yellow-card', 'red-card']
+  const groups = new Map()
+
+  events
+    .filter((event) => allowed.includes(event.type))
+    .forEach((event) => {
+      const current = groups.get(event.type) ?? []
+      current.push(event.minute)
+      groups.set(event.type, current)
+    })
+
+  return Array.from(groups.entries()).map(([type, minutes]) => ({
+    type,
+    minutes: minutes.join(', '),
+  }))
 }

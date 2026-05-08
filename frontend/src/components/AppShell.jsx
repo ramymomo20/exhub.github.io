@@ -54,20 +54,6 @@ export function AppShell() {
       <main className="page-wrap">
         <Outlet />
       </main>
-
-      <footer className="site-footer">
-        <div className="footer-brand">
-          <strong>IOSCA Hub</strong>
-          <p>Competitive IOSoccer identity built around players, teams, matches, rankings, and tournament history.</p>
-        </div>
-        <nav className="footer-nav" aria-label="Footer">
-          {navItems.map((item) => (
-            <NavLink key={item.label} to={item.to} end={item.end} className="footer-link">
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </footer>
     </div>
   )
 }
