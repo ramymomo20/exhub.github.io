@@ -34,25 +34,45 @@ export function TournamentDetailPage() {
       <section className="dashboard-grid">
         {tournament.standingsGroups.map((group) => (
           <Widget key={group.name} title={group.name} className="span-two">
-            <div className="standings-list">
-              {group.rows.map((row, index) => (
-                <div key={`${group.name}-${row.teamId}`} className={`standings-row ${index === 0 ? 'is-first' : index === 1 ? 'is-second' : ''}`}>
-                  <div className="standings-team">
-                    <TeamInlineLink teamId={row.teamId} />
-                    <FormPills values={row.form} />
-                  </div>
-                  <div className="standings-metrics">
-                    <span>P {row.played}</span>
-                    <span>W {row.wins}</span>
-                    <span>D {row.draws}</span>
-                    <span>L {row.losses}</span>
-                    <span>GF {row.goalsFor}</span>
-                    <span>GA {row.goalsAgainst}</span>
-                    <span className={row.gd > 0 ? 'gd-positive' : row.gd < 0 ? 'gd-negative' : 'gd-neutral'}>GD {row.gd}</span>
-                    <strong>{row.points} pts</strong>
-                  </div>
-                </div>
-              ))}
+            <div className="table-shell standings-table-shell">
+              <table className="standings-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>Form</th>
+                    <th>MP</th>
+                    <th>W</th>
+                    <th>D</th>
+                    <th>L</th>
+                    <th>GF</th>
+                    <th>GA</th>
+                    <th>GD</th>
+                    <th>PTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.rows.map((row, index) => (
+                    <tr key={`${group.name}-${row.teamId}`} className={index === 0 ? 'standing-first' : index === 1 ? 'standing-second' : ''}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <div className="standings-team-cell">
+                          <TeamInlineLink teamId={row.teamId} compact />
+                        </div>
+                      </td>
+                      <td><FormPills values={row.form} /></td>
+                      <td>{row.played}</td>
+                      <td>{row.wins}</td>
+                      <td>{row.draws}</td>
+                      <td>{row.losses}</td>
+                      <td>{row.goalsFor}</td>
+                      <td>{row.goalsAgainst}</td>
+                      <td className={row.gd > 0 ? 'gd-positive' : row.gd < 0 ? 'gd-negative' : 'gd-neutral'}>{row.gd}</td>
+                      <td><strong>{row.points}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Widget>
         ))}

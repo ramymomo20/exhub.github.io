@@ -79,6 +79,18 @@ h1, h2, h3, p, strong, span, small, a {
   color: #06101d;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 16px 30px rgba(79, 124, 255, 0.32);
 }
+
+.brand-mark-image {
+  overflow: hidden;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.brand-mark-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .brand strong { display: block; font-weight: 800; }
 .brand small { display: block; color: var(--text-faint); }
 .main-nav { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
@@ -938,6 +950,16 @@ th { color: var(--text-faint); font-weight: 600; }
   gap: 4px;
 }
 
+.event-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(10, 16, 23, 0.82);
+}
+
 .pitch-rating {
   position: absolute;
   top: -10px;
@@ -971,6 +993,13 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .pitch-marker:hover .pitch-tooltip {
   display: block;
+}
+
+.event-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  display: inline-block;
 }
 
 .icon-ball,
@@ -1241,6 +1270,12 @@ th { color: var(--text-faint); font-weight: 600; }
   background: rgba(255, 255, 255, 0.06);
 }
 
+.form-pill img {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
 .category-pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -1304,6 +1339,37 @@ th { color: var(--text-faint); font-weight: 600; }
 .standings-list {
   display: grid;
   gap: 12px;
+}
+
+.standings-table-shell {
+  overflow-x: auto;
+}
+
+.standings-table {
+  min-width: 860px;
+}
+
+.standings-table td,
+.standings-table th {
+  text-align: center;
+}
+
+.standings-table td:nth-child(2),
+.standings-table th:nth-child(2) {
+  text-align: left;
+}
+
+.standings-table tr.standing-first {
+  background: rgba(74, 227, 160, 0.08);
+}
+
+.standings-table tr.standing-second {
+  background: rgba(255, 203, 103, 0.08);
+}
+
+.standings-team-cell {
+  display: flex;
+  align-items: center;
 }
 
 .standings-row {

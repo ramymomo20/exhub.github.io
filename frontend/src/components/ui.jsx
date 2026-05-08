@@ -2,6 +2,20 @@ import { Link } from 'react-router-dom'
 import { getPlayerById, getTeamById, getTeamName } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
+const ICON_BASE = `${import.meta.env.BASE_URL}icons/`
+const ICON_MAP = {
+  goal: `${ICON_BASE}soccer-ball-icon.png`,
+  'own-goal': `${ICON_BASE}soccer-ball-icon.png`,
+  'yellow-card': `${ICON_BASE}yellow-card-icon.png`,
+  'red-card': `${ICON_BASE}red-card-icon.png`,
+  assist: `${ICON_BASE}cleats-icon.png`,
+  save: `${ICON_BASE}glove-icon.png`,
+  mvp: `${ICON_BASE}gold-medal-icon.png`,
+  W: `${ICON_BASE}form-w.svg`,
+  D: `${ICON_BASE}form-d.svg`,
+  L: `${ICON_BASE}form-l.svg`,
+}
+
 export function PageIntro({ eyebrow, title, description, aside }) {
   return (
     <section className="page-intro card">
@@ -229,8 +243,9 @@ export function SimpleTable({ rows, columns }) {
   )
 }
 
-export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, tooltips = {} }) {
-  const items = lineups ?? playersOnPitch
+export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, tooltips = {}, format = '5v5' }) {
+  const rawItems = lineups ?? playersOnPitch
+  const items = mode === 'match' ? mapLineupToFormation(rawItems, format) : rawItems
 
   return (
     <div className={`pitch-shell ${mode === 'match' ? 'pitch-shell-match' : ''}`}>
@@ -278,14 +293,13 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
 }
 
 export function EventIcon({ type }) {
-  if (type === 'goal') return <span className="icon-ball" />
-  if (type === 'own-goal') return <span className="icon-own-goal" />
-  if (type === 'yellow-card') return <span className="icon-card icon-card-yellow" />
-  if (type === 'red-card') return <span className="icon-card icon-card-red" />
-  if (type === 'assist') return <span className="icon-assist" />
-  if (type === 'save') return <span className="icon-save" />
+  const src = ICON_MAP[type]
+
+  if (src) {
+    return <img className={`event-icon event-icon-${type}`} src={src} alt="" />
+  }
+
   if (type === 'miss') return <span className="icon-miss" />
-  if (type === 'mvp') return <span className="icon-crown" />
   return <span className="icon-dot" />
 }
 
@@ -297,10 +311,77 @@ export function FormPills({ values }) {
   return (
     <div className="form-pills">
       {values.map((value, index) => (
-        <span key={`${value}-${index}`} className={`form-pill result-${value.toLowerCase()}`}>{value}</span>
+        <span key={`${value}-${index}`} className={`form-pill result-${value.toLowerCase()}`} title={value}>
+          <img src={ICON_MAP[value] ?? ''} alt={value} />
+        </span>
       ))}
     </div>
   )
+}
+
+const FORMATIONS = {
+  '4v4': [
+    { pos: 'GK', x: 50, y: 84 },
+    { pos: 'CB', x: 50, y: 62 },
+    { pos: 'LM', x: 26, y: 28 },
+    { pos: 'RM', x: 74, y: 28 },
+  ],
+  '5v5': [
+    { pos: 'GK', x: 50, y: 84 },
+    { pos: 'CB', x: 50, y: 64 },
+    { pos: 'LM', x: 24, y: 28 },
+    { pos: 'CF', x: 50, y: 24 },
+    { pos: 'RM', x: 76, y: 28 },
+  ],
+  '6v6': [
+    { pos: 'GK', x: 50, y: 85 },
+    { pos: 'LB', x: 22, y: 65 },
+    { pos: 'RB', x: 78, y: 65 },
+    { pos: 'CM', x: 50, y: 48 },
+    { pos: 'LW', x: 26, y: 24 },
+    { pos: 'RW', x: 74, y: 24 },
+  ],
+  '8v8': [
+    { pos: 'GK', x: 50, y: 86 },
+    { pos: 'LB', x: 18, y: 68 },
+    { pos: 'CB', x: 50, y: 67 },
+    { pos: 'RB', x: 82, y: 68 },
+    { pos: 'CM', x: 50, y: 49 },
+    { pos: 'LW', x: 22, y: 26 },
+    { pos: 'CF', x: 50, y: 21 },
+    { pos: 'RW', x: 78, y: 26 },
+  ],
+}
+
+function mapLineupToFormation(items, format) {
+  const slots = FORMATIONS[format] ?? FORMATIONS['5v5']
+  const normalized = (items ?? []).map((entry) => ({ ...entry, role: normalizeRole(entry.role) }))
+  const used = new Set()
+  const mapped = []
+
+  for (const slot of slots) {
+    const directIndex = normalized.findIndex((entry, index) => !used.has(index) && normalizeRole(entry.role) === slot.pos)
+    if (directIndex >= 0) {
+      used.add(directIndex)
+      mapped.push({ ...normalized[directIndex], x: slot.x, y: slot.y, role: slot.pos })
+      continue
+    }
+
+    const fallbackIndex = normalized.findIndex((_, index) => !used.has(index))
+    if (fallbackIndex >= 0) {
+      used.add(fallbackIndex)
+      mapped.push({ ...normalized[fallbackIndex], x: slot.x, y: slot.y, role: slot.pos })
+      continue
+    }
+
+    mapped.push({ player: '', role: slot.pos, x: slot.x, y: slot.y, badges: [] })
+  }
+
+  return mapped
+}
+
+function normalizeRole(role) {
+  return String(role ?? '').trim().toUpperCase()
 }
 
 function getRatingTierClass(rating) {

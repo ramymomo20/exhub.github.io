@@ -58,13 +58,13 @@ export function MatchDetailPage() {
               <div className="lineup-header">
                 <TeamInlineLink teamId={homeTeam.id} />
               </div>
-              <Pitch mode="match" lineups={match.lineups.home} tooltips={match.lineupTooltips} />
+              <Pitch mode="match" format={match.format} lineups={match.lineups.home} tooltips={match.lineupTooltips} />
             </div>
             <div>
               <div className="lineup-header">
                 <TeamInlineLink teamId={awayTeam.id} />
               </div>
-              <Pitch mode="match" lineups={match.lineups.away} tooltips={match.lineupTooltips} />
+              <Pitch mode="match" format={match.format} lineups={match.lineups.away} tooltips={match.lineupTooltips} />
             </div>
           </div>
         </Widget>

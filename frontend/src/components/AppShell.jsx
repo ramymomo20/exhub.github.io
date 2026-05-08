@@ -13,6 +13,8 @@ const navItems = [
 ]
 
 export function AppShell() {
+  const brandIcon = `${import.meta.env.BASE_URL}icons/iosca-icon.png`
+
   return (
     <div className="site-shell">
       <div className="site-glow site-glow-left" />
@@ -20,7 +22,9 @@ export function AppShell() {
 
       <header className="topbar">
         <NavLink className="brand" to="/">
-          <span className="brand-mark">IH</span>
+          <span className="brand-mark brand-mark-image">
+            <img src={brandIcon} alt="IOSCA Hub" />
+          </span>
           <span>
             <strong>IOSCA Hub</strong>
             <small>Neo Football Intelligence</small>
