@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { HomePage } from './pages/HomePage'
+import { DiscordPage } from './pages/DiscordPage'
 import { MatchDetailPage } from './pages/MatchDetailPage'
 import { MatchesPage } from './pages/MatchesPage'
 import { MediaPage } from './pages/MediaPage'
@@ -29,6 +30,7 @@ function App() {
         <Route path="/tournaments/:tournamentId" element={<TournamentDetailPage />} />
         <Route path="/records" element={<RecordsPage />} />
         <Route path="/media" element={<MediaPage />} />
+        <Route path="/discord" element={<DiscordPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

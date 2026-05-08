@@ -9,6 +9,7 @@ const navItems = [
   { to: '/tournaments', label: 'Tournaments' },
   { to: '/records', label: 'Records' },
   { to: '/media', label: 'Media' },
+  { to: '/discord', label: 'Discord' },
 ]
 
 export function AppShell() {
@@ -37,9 +38,6 @@ export function AppShell() {
               {item.label}
             </NavLink>
           ))}
-          <a className="nav-link nav-link-discord" href="https://discord.com" target="_blank" rel="noreferrer">
-            Discord
-          </a>
         </nav>
 
         <div className="topbar-tools">
@@ -56,7 +54,7 @@ export function AppShell() {
       <footer className="site-footer">
         <div className="footer-brand">
           <strong>IOSCA Hub</strong>
-          <p>Static-first frontend templates now, structured data adapters ready for database-backed content later.</p>
+          <p>Competitive IOSoccer identity built around players, teams, matches, rankings, and tournament history.</p>
         </div>
         <nav className="footer-nav" aria-label="Footer">
           {navItems.map((item) => (

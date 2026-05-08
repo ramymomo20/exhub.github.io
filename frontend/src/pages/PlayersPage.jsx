@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { PageIntro, PageTrail, PlayerBadge } from '../components/ui'
-import { listPlayers, listTeams } from '../data/repository'
+import { listPlayers, listPositionOptions, listTeams } from '../data/repository'
 
 export function PlayersPage() {
   const players = listPlayers()
   const teams = listTeams()
+  const positions = listPositionOptions()
   const [search, setSearch] = useState('')
   const [teamFilter, setTeamFilter] = useState('all')
   const [positionFilter, setPositionFilter] = useState('all')
@@ -17,17 +18,18 @@ export function PlayersPage() {
     .sort((left, right) => {
       if (sortBy === 'goals') return right.stats.goals - left.stats.goals
       if (sortBy === 'assists') return right.stats.assists - left.stats.assists
-      if (sortBy === 'form') return right.form.at(-1) - left.form.at(-1)
-      if (sortBy === 'winRate') return parseInt(right.stats.winRate, 10) - parseInt(left.stats.winRate, 10)
+      if (sortBy === 'interceptions') return right.stats.interceptions - left.stats.interceptions
+      if (sortBy === 'saves') return right.stats.saves - left.stats.saves
+      if (sortBy === 'appearances') return right.stats.appearances - left.stats.appearances
       return right.rating - left.rating
     })
 
   return (
     <div className="page-stack">
       <PageIntro
-        eyebrow="Player Index"
-        title="Scouting board, form board, reputation board."
-        description="A premium player directory for the IOSCA ecosystem, built around identity, tiering, and recent performance."
+        eyebrow="Players"
+        title="PLAYER DIRECTORY & SCOUTING BOARD"
+        description=""
         aside={<PageTrail items={[{ label: 'Home', to: '/' }, { label: 'Players' }]} />}
       />
 
@@ -49,7 +51,7 @@ export function PlayersPage() {
           Position
           <select value={positionFilter} onChange={(event) => setPositionFilter(event.target.value)}>
             <option value="all">All positions</option>
-            {['ST', 'CAM', 'RW', 'CDM', 'CB', 'LB'].map((position) => (
+            {positions.map((position) => (
               <option key={position} value={position}>{position}</option>
             ))}
           </select>
@@ -60,8 +62,9 @@ export function PlayersPage() {
             <option value="rating">Rating</option>
             <option value="goals">Goals</option>
             <option value="assists">Assists</option>
-            <option value="form">Form</option>
-            <option value="winRate">Win Rate</option>
+            <option value="interceptions">Interceptions</option>
+            <option value="saves">Saves</option>
+            <option value="appearances">Appearances</option>
           </select>
         </label>
       </section>

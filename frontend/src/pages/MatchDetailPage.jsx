@@ -1,6 +1,6 @@
 import { Navigate, useParams } from 'react-router-dom'
-import { MatchCard, PageTrail, Pitch, PlayerBadge, Widget } from '../components/ui'
-import { getMatchById, getTeamById, listPlayersByIds } from '../data/repository'
+import { EventIcon, PageTrail, Pitch, PlayerInlineLink, TeamInlineLink, Widget } from '../components/ui'
+import { getMatchById, getPlayerById, getTeamById } from '../data/repository'
 
 export function MatchDetailPage() {
   const { matchId } = useParams()
@@ -12,32 +12,108 @@ export function MatchDetailPage() {
 
   const homeTeam = getTeamById(match.homeTeamId)
   const awayTeam = getTeamById(match.awayTeamId)
-  const topPlayers = listPlayersByIds(match.topPerformers ?? [])
+  const mvp = getPlayerById(match.mvpId)
 
   return (
     <div className="page-stack">
       <PageTrail items={[{ label: 'Home', to: '/' }, { label: 'Matches', to: '/matches' }, { label: `${homeTeam?.shortName} vs ${awayTeam?.shortName}` }]} />
-      <section className="match-hero card">
-        <div className="hero-team-side">
-          <span className="big-crest" style={{ '--team-a': homeTeam?.colors[0], '--team-b': homeTeam?.colors[1] }}>{homeTeam?.crest}</span>
-          <strong>{homeTeam?.name}</strong>
+
+      <section className="match-hero card match-hero-expanded">
+        <div className="match-hero-meta-line">
+          <span>{match.date}</span>
+          <span>{match.time}</span>
         </div>
-        <div className="match-hero-center">
-          <span className="eyebrow">{match.tournament}</span>
-          <h1>{match.homeScore} : {match.awayScore}</h1>
-          <p>{match.date} | {match.format} | {match.duration} | MVP {match.mvp}</p>
-        </div>
-        <div className="hero-team-side">
-          <span className="big-crest" style={{ '--team-a': awayTeam?.colors[0], '--team-b': awayTeam?.colors[1] }}>{awayTeam?.crest}</span>
-          <strong>{awayTeam?.name}</strong>
+
+        <div className="match-hero-grid">
+          <div className="hero-side hero-side-left">
+            <div className="hero-team-block">
+              <TeamInlineLink teamId={homeTeam.id} />
+            </div>
+            <EventStack title="" entries={match.homeEventStack} />
+          </div>
+
+          <div className="match-hero-center match-hero-center-expanded">
+            <span className="eyebrow">{match.competition}</span>
+            <div className="match-mvp-link">
+              <span>Player of the Match</span>
+              <PlayerInlineLink playerId={mvp?.id} compact />
+            </div>
+            <h1>{match.homeScore} : {match.awayScore}</h1>
+            <small className="format-pill-large">{match.format}</small>
+          </div>
+
+          <div className="hero-side hero-side-right">
+            <div className="hero-team-block hero-team-block-right">
+              <TeamInlineLink teamId={awayTeam.id} />
+            </div>
+            <EventStack title="" entries={match.awayEventStack} />
+          </div>
         </div>
       </section>
 
       <section className="dashboard-grid">
-        <Widget title="Match Stats Comparison" className="span-two">
+        <Widget title="Player of the Match" className="match-detail-sidecard">
+          <div className="mvp-panel">
+            <PlayerInlineLink playerId={mvp?.id} />
+            <div className="mvp-summary-grid">
+              {match.mvpSummary.map((item) => (
+                <div key={item.label}>
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Widget>
+
+        <Widget title="Game Highlights" className="span-two">
+          <div className="highlights-list">
+            {match.gameHighlights.map((item) => (
+              <div key={`${item.minute}-${item.text}`} className="highlight-row">
+                <strong>{item.minute}&apos;</strong>
+                <EventIcon type={item.type} />
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </Widget>
+
+        <Widget title="Shot Map and Zones" className="span-two">
+          <div className="shot-zones-grid">
+            {match.shotZones.map((zone) => (
+              <div key={zone.zone} className="shot-zone-card">
+                <span>{zone.zone}</span>
+                <div className="shot-zone-score">
+                  <strong>{zone.home}</strong>
+                  <small>vs</small>
+                  <strong>{zone.away}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Widget>
+
+        <Widget title="Lineups" className="span-two">
+          <div className="lineups-grid">
+            <div>
+              <div className="lineup-header">
+                <TeamInlineLink teamId={homeTeam.id} />
+              </div>
+              <Pitch mode="match" lineups={match.lineups.home} tooltips={match.lineupTooltips} />
+            </div>
+            <div>
+              <div className="lineup-header">
+                <TeamInlineLink teamId={awayTeam.id} />
+              </div>
+              <Pitch mode="match" lineups={match.lineups.away} tooltips={match.lineupTooltips} />
+            </div>
+          </div>
+        </Widget>
+
+        <Widget title="Match Stats Comparison" className="span-two comparison-widget-standalone">
           <div className="comparison-grid">
-            {(match.stats ?? []).map(([label, homeValue, awayValue]) => (
-              <div key={label} className="comparison-row">
+            {match.comparisonStats.map(([label, homeValue, awayValue]) => (
+              <div key={label} className="comparison-row comparison-row-standalone">
                 <strong>{homeValue}</strong>
                 <span>{label}</span>
                 <strong>{awayValue}</strong>
@@ -45,61 +121,27 @@ export function MatchDetailPage() {
             ))}
           </div>
         </Widget>
-
-        <Widget title="Turning Point">
-          <p className="spotlight-copy">{match.turningPoint}</p>
-        </Widget>
-
-        <Widget title="Goal Timeline" className="span-two">
-          <div className="timeline">
-            {(match.timeline ?? []).map((event) => (
-              <div key={`${event.minute}-${event.detail}`} className={`timeline-event side-${event.side}`}>
-                <strong>{event.minute}&apos;</strong>
-                <span>{event.label}</span>
-                <p>{event.detail}</p>
-              </div>
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Momentum Graph">
-          <div className="line-chart momentum-chart">
-            {(match.momentum ?? []).map((value, index) => (
-              <div key={`${value}-${index}`} className="line-bar">
-                <span style={{ height: `${value}%` }} />
-              </div>
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Top Performers" className="span-two">
-          <div className="horizontal-rail">
-            {topPlayers.map((player) => (
-              <PlayerBadge key={player.id} player={player} compact />
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Tactical Pitch" className="span-two">
-          <Pitch playersOnPitch={match.lineup ?? []} />
-        </Widget>
-
-        <Widget title="Community Vote">
-          <div className="vote-stack">
-            {(match.votes ?? []).map((vote) => (
-              <div key={vote.label} className="vote-row">
-                <span>{vote.label}</span>
-                <div className="meter"><i style={{ width: `${vote.percent}%` }} /></div>
-                <strong>{vote.percent}%</strong>
-              </div>
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Related Match">
-          <MatchCard match={match} />
-        </Widget>
       </section>
+    </div>
+  )
+}
+
+function EventStack({ entries }) {
+  return (
+    <div className="event-stack">
+      {entries.map((entry) => (
+        <div key={`${entry.playerName}-${entry.events[0]?.minute}`} className="event-stack-row">
+          <strong>{entry.playerName}</strong>
+          <div className="event-stack-events">
+            {entry.events.map((event) => (
+              <span key={`${entry.playerName}-${event.minute}-${event.type}`} className="event-stack-badge">
+                <EventIcon type={event.type} />
+                <small>{event.minute}&apos;</small>
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
