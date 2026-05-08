@@ -51,49 +51,8 @@ export function MatchDetailPage() {
         </div>
       </section>
 
-      <section className="dashboard-grid">
-        <Widget title="Player of the Match" className="match-detail-sidecard">
-          <div className="mvp-panel">
-            <PlayerInlineLink playerId={mvp?.id} />
-            <div className="mvp-summary-grid">
-              {match.mvpSummary.map((item) => (
-                <div key={item.label}>
-                  <strong>{item.value}</strong>
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Widget>
-
-        <Widget title="Game Highlights" className="span-two">
-          <div className="highlights-list">
-            {match.gameHighlights.map((item) => (
-              <div key={`${item.minute}-${item.text}`} className="highlight-row">
-                <strong>{item.minute}&apos;</strong>
-                <EventIcon type={item.type} />
-                <span>{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Shot Map and Zones" className="span-two">
-          <div className="shot-zones-grid">
-            {match.shotZones.map((zone) => (
-              <div key={zone.zone} className="shot-zone-card">
-                <span>{zone.zone}</span>
-                <div className="shot-zone-score">
-                  <strong>{zone.home}</strong>
-                  <small>vs</small>
-                  <strong>{zone.away}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Lineups" className="span-two">
+      <section className="dashboard-grid match-detail-layout">
+        <Widget title="Lineups" className="span-two lineups-main-widget">
           <div className="lineups-grid">
             <div>
               <div className="lineup-header">
@@ -110,7 +69,50 @@ export function MatchDetailPage() {
           </div>
         </Widget>
 
-        <Widget title="Match Stats Comparison" className="span-two comparison-widget-standalone">
+        <div className="match-detail-rail">
+          <Widget title="Player of the Match" className="match-detail-sidecard">
+            <div className="mvp-panel">
+              <PlayerInlineLink playerId={mvp?.id} />
+              <div className="mvp-summary-grid">
+                {match.mvpSummary.map((item) => (
+                  <div key={item.label}>
+                    <strong>{item.value}</strong>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Widget>
+
+          <Widget title="Game Highlights" className="match-detail-sidecard">
+            <div className="highlights-list">
+              {match.gameHighlights.map((item) => (
+                <div key={`${item.minute}-${item.text}`} className="highlight-row">
+                  <strong>{item.minute}&apos;</strong>
+                  <EventIcon type={item.type} />
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </Widget>
+        </div>
+
+        <Widget title="Shot Map and Zones" className="span-full">
+          <div className="shot-zones-grid">
+            {match.shotZones.map((zone) => (
+              <div key={zone.zone} className="shot-zone-card">
+                <span>{zone.zone}</span>
+                <div className="shot-zone-score">
+                  <strong>{zone.home}</strong>
+                  <small>vs</small>
+                  <strong>{zone.away}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Widget>
+
+        <Widget title="Match Stats Comparison" className="span-full comparison-widget-standalone">
           <div className="comparison-grid">
             {match.comparisonStats.map(([label, homeValue, awayValue]) => (
               <div key={label} className="comparison-row comparison-row-standalone">
@@ -131,7 +133,9 @@ function EventStack({ entries }) {
     <div className="event-stack">
       {entries.map((entry) => (
         <div key={`${entry.playerName}-${entry.events[0]?.minute}`} className="event-stack-row">
-          <strong>{entry.playerName}</strong>
+          <div className="event-stack-player">
+            <strong>{entry.playerName}</strong>
+          </div>
           <div className="event-stack-events">
             {entry.events.map((event) => (
               <span key={`${entry.playerName}-${event.minute}-${event.type}`} className="event-stack-badge">

@@ -59,14 +59,10 @@ export function PlayerProfilePage() {
         </Widget>
 
         <Widget title="Activity Map">
-          <div className="activity-map">
-            {player.activity.map((value, index) => (
-              <span key={`${value}-${index}`} className={`activity-cell level-${Math.min(value, 5)}`} />
-            ))}
-          </div>
+          <ActivityMap values={player.activity} />
         </Widget>
 
-        <Widget title="Statistics" className="span-two">
+        <Widget title="Statistics" className="span-full">
           <div className="stats-section-grid">
             <StatSection title="General" items={[
               ['Appearances', player.stats.appearances],
@@ -164,6 +160,55 @@ export function PlayerProfilePage() {
       </section>
     </div>
   )
+}
+
+function ActivityMap({ values }) {
+  const cells = buildActivityCells(values)
+
+  return (
+    <div className="activity-map-shell">
+      <div className="activity-map-legend">
+        <span>Low</span>
+        <div className="activity-map-legend-scale">
+          {[0, 1, 2, 3, 4, 5].map((value) => (
+            <span key={value} className={`activity-cell level-${value}`} />
+          ))}
+        </div>
+        <span>High</span>
+      </div>
+
+      <div className="activity-map-scroll">
+        <div className="activity-map-year">
+          {cells.map((cell) => (
+            <span
+              key={cell.date}
+              className={`activity-cell level-${cell.level}`}
+              title={`${cell.label}: ${cell.value} matches`}
+              aria-label={`${cell.label}: ${cell.value} matches`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function buildActivityCells(values) {
+  const base = Array.isArray(values) && values.length ? values : [0]
+  const start = new Date('2026-01-01T00:00:00')
+
+  return Array.from({ length: 365 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    const value = base[index % base.length]
+
+    return {
+      date: date.toISOString().slice(0, 10),
+      label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      value,
+      level: Math.min(Math.max(value, 0), 5),
+    }
+  })
 }
 
 function StatSection({ title, items }) {
