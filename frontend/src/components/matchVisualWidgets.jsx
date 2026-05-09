@@ -5,7 +5,7 @@ import { getPlayerById } from '../data/repository'
 
 const JERSEY_ICON = `${import.meta.env.BASE_URL}icons/jersey-icon.png`
 
-const SHOT_FILTERS = ['goal', 'save', 'miss', 'yellow-card', 'red-card', 'own-goal']
+const SHOT_FILTERS = ['goal', 'save', 'miss', 'yellow-card', 'second_yellow', 'red-card', 'own-goal']
 
 const FORMATION_COORDS = {
   '4v4': [
@@ -142,7 +142,7 @@ export function PlayerMarker({ player, mode, teamColors }) {
         </div>
         <JerseyMarker teamColors={teamColors} position={player.position} />
         <div className="event-stack-vertical event-stack-right">
-          {mode === 'stats' ? renderEventStack(player.events, ['yellow-card', 'red-card', 'own-goal']) : null}
+          {mode === 'stats' ? renderEventStack(player.events, ['yellow-card', 'second_yellow', 'red-card', 'own-goal']) : null}
         </div>
       </div>
 
@@ -429,6 +429,7 @@ function badgesToEvents(badges = []) {
     goals: byType.goal ?? 0,
     assists: byType.assist ?? 0,
     yellowCards: byType['yellow-card'] ?? 0,
+    secondYellowCards: byType.second_yellow ?? byType['second-yellow'] ?? 0,
     redCards: byType['red-card'] ?? 0,
     saves: byType.save ?? 0,
     ownGoals: byType['own-goal'] ?? 0,
@@ -454,6 +455,7 @@ function toEventBadgeData(kind, events) {
     assist: { type: 'assist', count: events.assists, iconType: 'assist' },
     save: { type: 'save', count: events.saves, iconType: 'save' },
     'yellow-card': { type: 'yellow-card', count: events.yellowCards, iconType: 'yellow-card' },
+    second_yellow: { type: 'second_yellow', count: events.secondYellowCards, iconType: 'second_yellow' },
     'red-card': { type: 'red-card', count: events.redCards, iconType: 'red-card' },
     'own-goal': { type: 'own-goal', count: events.ownGoals, iconType: 'own-goal' },
   }

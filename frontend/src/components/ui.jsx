@@ -7,6 +7,8 @@ const ICON_MAP = {
   goal: `${ICON_BASE}soccer-ball-icon.png`,
   'own-goal': `${ICON_BASE}soccer-ball-icon.png`,
   'yellow-card': `${ICON_BASE}yellow-card-icon.png`,
+  'second-yellow': `${ICON_BASE}second-yellow-card-icon.png`,
+  second_yellow: `${ICON_BASE}second-yellow-card-icon.png`,
   'red-card': `${ICON_BASE}red-card-icon.png`,
   assist: `${ICON_BASE}cleats-icon.png`,
   save: `${ICON_BASE}glove-icon.png`,
