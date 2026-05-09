@@ -1287,38 +1287,41 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .pitch-rating {
   position: absolute;
-  top: -8px;
-  left: 8px;
-  min-width: 28px;
-  height: 18px;
-  padding: 0 6px;
+  top: -14px;
+  left: 4px;
+  min-width: 30px;
+  height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
   border: 1px solid rgba(134, 182, 255, 0.48);
   background: rgba(9, 24, 45, 0.95);
-  color: #111923;
-  font-size: 0.69rem;
-  line-height: 18px;
+  color: #0f1722 !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
   pointer-events: none;
+  z-index: 6;
 }
 
 .rating-good {
   background: rgba(151, 255, 204, 0.96);
-  color: #103122;
+  color: #103122 !important;
 }
 
 .rating-mid {
   background: rgba(185, 196, 214, 0.96);
-  color: #192333;
+  color: #192333 !important;
 }
 
 .rating-bad {
   background: rgba(255, 122, 143, 0.96);
-  color: #2f1016;
+  color: #2f1016 !important;
 }
 
 .rating-mvp {
   background: rgba(255, 215, 101, 0.98);
-  color: #2b1d00;
+  color: #2b1d00 !important;
 }
 
 .pitch-player-stats {
