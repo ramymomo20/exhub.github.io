@@ -35,6 +35,24 @@ export function PlayerProfilePage() {
           <div className="profile-badges">
             <TeamInlineLink teamId={player.teamId} />
           </div>
+          <div className="profile-focus-grid">
+            <div className="profile-focus-card">
+              <span>Goals</span>
+              <strong>{player.stats.goals}</strong>
+            </div>
+            <div className="profile-focus-card">
+              <span>Assists</span>
+              <strong>{player.stats.assists}</strong>
+            </div>
+            <div className="profile-focus-card">
+              <span>Passes</span>
+              <strong>{player.stats.apasses}</strong>
+            </div>
+            <div className="profile-focus-card">
+              <span>Interceptions</span>
+              <strong>{player.stats.interceptions}</strong>
+            </div>
+          </div>
         </div>
 
         <div className="profile-summary">
@@ -74,7 +92,7 @@ export function PlayerProfilePage() {
             ]} />
             <StatSection title="Teamplay" items={[
               ['Assists', player.stats.assists],
-              ['APasses', player.stats.apasses],
+              ['Passes', player.stats.apasses],
               ['Passes completed', player.stats.passesCompleted],
               ['Pass accuracy', `${player.stats.passAccuracy}%`],
               ['Key passes', player.stats.keyPasses],

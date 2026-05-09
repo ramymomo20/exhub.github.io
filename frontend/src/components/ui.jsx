@@ -243,9 +243,11 @@ export function SimpleTable({ rows, columns }) {
   )
 }
 
-export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, tooltips = {}, format = '5v5' }) {
+export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, tooltips = {}, format = '5v5', shirtColors = null }) {
   const rawItems = lineups ?? playersOnPitch
   const items = mode === 'match' ? mapLineupToFormation(rawItems, format) : rawItems
+  const shirtStyle = shirtColors ? { '--shirt-a': shirtColors[0], '--shirt-b': shirtColors[1] ?? shirtColors[0] } : {}
+  const darkText = shirtColors && isLightColor(shirtColors[0])
 
   return (
     <div className={`pitch-shell ${mode === 'match' ? 'pitch-shell-match' : ''}`}>
@@ -264,7 +266,7 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
               style={{ left: `${entry.x}%`, top: `${entry.y}%` }}
             >
               {entry.rating ? <span className={`pitch-rating ${ratingClass}`}>{entry.rating}</span> : null}
-              <div className="pitch-shirt">
+              <div className={`pitch-shirt ${darkText ? 'pitch-shirt-dark' : ''}`} style={shirtStyle}>
                 <strong>{entry.role}</strong>
               </div>
               <span className="pitch-player-name">{player?.name ?? entry.player ?? entry.playerId}</span>
@@ -401,6 +403,18 @@ function PitchStatChips({ badges = [] }) {
       ))}
     </div>
   )
+}
+
+function isLightColor(hex) {
+  if (!hex || !hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) return false
+  const normalized = hex.length === 4
+    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+    : hex
+  const r = Number.parseInt(normalized.slice(1, 3), 16)
+  const g = Number.parseInt(normalized.slice(3, 5), 16)
+  const b = Number.parseInt(normalized.slice(5, 7), 16)
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000
+  return brightness > 165
 }
 
 function getRatingTierClass(rating) {

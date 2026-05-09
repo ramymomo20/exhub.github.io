@@ -749,13 +749,28 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .match-hero-expanded {
   display: grid;
-  gap: 18px;
+  gap: 20px;
+}
+
+.match-hero-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 16px;
+}
+
+.match-hero-competition {
+  justify-self: center;
+}
+
+.match-hero-topbar .match-card-flags {
+  justify-self: end;
 }
 
 .match-hero-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(260px, 340px) minmax(260px, 1fr);
-  gap: 28px;
+  grid-template-columns: minmax(280px, 1fr) minmax(220px, 320px) minmax(280px, 1fr);
+  gap: 22px;
   align-items: center;
 }
 
@@ -775,7 +790,7 @@ th { color: var(--text-faint); font-weight: 600; }
 .event-stack {
   display: grid;
   gap: 12px;
-  max-height: 260px;
+  max-height: 230px;
   overflow-y: auto;
 }
 
@@ -829,16 +844,19 @@ th { color: var(--text-faint); font-weight: 600; }
   justify-items: center;
   align-content: center;
   gap: 10px;
+  text-align: center;
 }
 
 .match-hero-center-expanded h1 {
   margin-top: 4px;
+  line-height: 0.88;
 }
 
 .format-pill-large {
   display: inline-flex;
   justify-content: center;
   min-width: 86px;
+  margin-top: 4px;
   padding: 8px 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
@@ -940,7 +958,7 @@ th { color: var(--text-faint); font-weight: 600; }
 .lineup-team-card {
   border-radius: 22px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(152, 174, 214, 0.12);
 }
 
@@ -971,19 +989,23 @@ th { color: var(--text-faint); font-weight: 600; }
 }
 
 .pitch-marker {
-  width: 104px;
+  width: 98px;
   gap: 4px;
 }
 
 .pitch-shirt {
-  width: 60px;
-  height: 54px;
+  width: 56px;
+  height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 18px 18px 12px 12px;
-  background: linear-gradient(180deg, #4161ff, #3650d8);
+  border-radius: 14px 14px 10px 10px;
+  background: linear-gradient(180deg, var(--shirt-a, #4161ff), var(--shirt-b, #3650d8));
   color: #f8fbff;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.pitch-shirt-dark {
+  color: #162233;
 }
 
 .pitch-marker.is-mvp .pitch-shirt {
@@ -993,13 +1015,19 @@ th { color: var(--text-faint); font-weight: 600; }
 }
 
 .pitch-player-name {
-  padding: 4px 8px;
+  min-height: 18px;
+  padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(10, 16, 23, 0.72);
-  max-width: 100px;
+  background: #213452;
+  color: #f2f6ff;
+  max-width: 102px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.1;
+  font-weight: 700;
 }
 
 .pitch-rating {
@@ -1048,8 +1076,8 @@ th { color: var(--text-faint); font-weight: 600; }
   gap: 4px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(11, 25, 49, 0.86);
-  border: 1px solid rgba(135, 183, 255, 0.32);
+  background: #ffc72f;
+  border: 1px solid rgba(189, 139, 22, 0.44);
 }
 
 .pitch-stat-chip .event-icon {
@@ -1061,7 +1089,7 @@ th { color: var(--text-faint); font-weight: 600; }
   font-style: normal;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #e7f2ff;
+  color: #2a2209;
 }
 
 .pitch-tooltip {
@@ -1184,6 +1212,34 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .profile-center {
   align-self: center;
+}
+
+.profile-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.profile-focus-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(152, 174, 214, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.profile-focus-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-focus-card strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.35rem;
 }
 
 .profile-position-badge {
@@ -1521,6 +1577,10 @@ th { color: var(--text-faint); font-weight: 600; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .profile-focus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .scoreboard-expanded {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -1604,6 +1664,10 @@ th { color: var(--text-faint); font-weight: 600; }
   }
 
   .stats-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-focus-grid {
     grid-template-columns: 1fr;
   }
 }

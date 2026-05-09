@@ -70,7 +70,7 @@ export function TeamProfilePage() {
             ]} />
             <TeamStatSection title="Teamplay" items={[
               ['Assists', aggregated.assists],
-              ['APasses', aggregated.apasses],
+              ['Passes', aggregated.apasses],
               ['Passes completed', aggregated.passesCompleted],
               ['Pass accuracy', `${aggregated.passAccuracy}%`],
               ['Key passes', aggregated.keyPasses],

@@ -19,6 +19,17 @@ export function MatchDetailPage() {
       <PageTrail items={[{ label: 'Home', to: '/' }, { label: 'Matches', to: '/matches' }, { label: `${homeTeam?.shortName} vs ${awayTeam?.shortName}` }]} />
 
       <section className="match-hero card match-hero-expanded">
+        <div className="match-hero-topbar">
+          <div />
+          <span className="eyebrow match-hero-competition">{match.competition}</span>
+          <div className="match-card-flags">
+            {match.flags.map((flag) => (
+              <span key={flag} className="flag-pill">{flag}</span>
+            ))}
+            <span className={`status-pill ${match.status.toLowerCase().includes('live') ? 'is-live' : ''}`}>{match.status}</span>
+          </div>
+        </div>
+
         <div className="match-hero-grid">
           <div className="hero-side hero-side-left">
             <div className="hero-team-block">
@@ -28,12 +39,12 @@ export function MatchDetailPage() {
           </div>
 
           <div className="match-hero-center match-hero-center-expanded">
-            <span className="eyebrow">{match.competition}</span>
             <div className="match-mvp-link">
               <span>Player of the Match</span>
               <PlayerInlineLink playerId={mvp?.id} compact />
             </div>
             <h1>{match.homeScore} : {match.awayScore}</h1>
+            <small className="format-pill-large">{match.format}</small>
           </div>
 
           <div className="hero-side hero-side-right">
@@ -45,13 +56,8 @@ export function MatchDetailPage() {
         </div>
 
         <div className="match-hero-bottom-row">
-          <div className="match-card-flags">
-            {match.flags.map((flag) => (
-              <span key={flag} className="flag-pill">{flag}</span>
-            ))}
-            <span className={`status-pill ${match.status.toLowerCase().includes('live') ? 'is-live' : ''}`}>{match.status}</span>
-          </div>
-          <small className="format-pill-large">{match.format}</small>
+          <div />
+          <div />
           <div className="match-hero-datetime">
             <span>{match.date}</span>
             <strong>{match.time}</strong>
@@ -66,13 +72,13 @@ export function MatchDetailPage() {
               <div className="lineup-team-header">
                 <TeamInlineLink teamId={homeTeam.id} />
               </div>
-              <Pitch mode="match" format={match.format} lineups={match.lineups.home} tooltips={match.lineupTooltips} />
+              <Pitch mode="match" format={match.format} lineups={match.lineups.home} tooltips={match.lineupTooltips} shirtColors={homeTeam?.colors} />
             </div>
             <div className="lineup-team-card">
               <div className="lineup-team-header">
                 <TeamInlineLink teamId={awayTeam.id} />
               </div>
-              <Pitch mode="match" format={match.format} lineups={match.lineups.away} tooltips={match.lineupTooltips} />
+              <Pitch mode="match" format={match.format} lineups={match.lineups.away} tooltips={match.lineupTooltips} shirtColors={awayTeam?.colors} />
             </div>
           </div>
         </Widget>
