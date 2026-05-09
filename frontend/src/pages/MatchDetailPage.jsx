@@ -32,10 +32,12 @@ export function MatchDetailPage() {
 
         <div className="match-hero-grid">
           <div className="hero-side hero-side-left">
-            <div className="hero-team-block">
-              <TeamInlineLink teamId={homeTeam.id} />
+            <div className="hero-side-inner hero-side-inner-left">
+              <div className="hero-team-block">
+                <TeamInlineLink teamId={homeTeam.id} />
+              </div>
+              <EventStack title="" entries={match.homeEventStack} />
             </div>
-            <EventStack title="" entries={match.homeEventStack} />
           </div>
 
           <div className="match-hero-center match-hero-center-expanded">
@@ -48,10 +50,12 @@ export function MatchDetailPage() {
           </div>
 
           <div className="hero-side hero-side-right">
-            <div className="hero-team-block hero-team-block-right">
-              <TeamInlineLink teamId={awayTeam.id} />
+            <div className="hero-side-inner hero-side-inner-right">
+              <EventStack title="" entries={match.awayEventStack} />
+              <div className="hero-team-block hero-team-block-right">
+                <TeamInlineLink teamId={awayTeam.id} />
+              </div>
             </div>
-            <EventStack title="" entries={match.awayEventStack} />
           </div>
         </div>
 

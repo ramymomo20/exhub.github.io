@@ -180,6 +180,10 @@ export function MatchCard({ match }) {
     <article className="match-card card">
       <div className="match-card-head">
         <span className="match-tag">{match.competition}</span>
+        <div className="match-card-datetime">
+          <strong>{match.date}</strong>
+          <small>{match.time}</small>
+        </div>
         <div className="match-card-flags">
           {match.flags.map((flag) => (
             <span key={flag} className="flag-pill">{flag}</span>
@@ -198,7 +202,6 @@ export function MatchCard({ match }) {
 
         <Link className="score-center score-center-link" to={`/matches/${match.id}`}>
           <span className="scoreline">{match.homeScore} : {match.awayScore}</span>
-          <small>{match.date} | {match.time}</small>
         </Link>
 
         <div className={`score-team ${awayWon ? 'is-winner' : ''}`}>
