@@ -3239,6 +3239,158 @@ th { color: var(--text-faint); font-weight: 600; }
   }
 }
 
+.event-stack-right .event-stack-events-inline {
+  margin-right: 10px;
+}
+
+.event-stack-left .event-stack-events-inline {
+  margin-left: 10px;
+}
+
+.event-stack-events-inline {
+  gap: 8px;
+}
+
+.rating-badge.rating-mvp {
+  background: linear-gradient(135deg, #ffe082, #ffd15a) !important;
+  color: #071018 !important;
+}
+
+.rating-badge.rating-low {
+  background: linear-gradient(135deg, #ff8d71, #e15454) !important;
+  color: #ffffff !important;
+}
+
+.rating-badge.rating-grey {
+  background: linear-gradient(135deg, #7f8898, #5f6978) !important;
+  color: #ffffff !important;
+}
+
+.rating-badge.rating-green {
+  background: linear-gradient(135deg, #8de5aa, #48bc69) !important;
+  color: #061018 !important;
+}
+
+.rating-badge.rating-blue {
+  background: linear-gradient(135deg, #82d7ff, #4e7fff) !important;
+  color: #061018 !important;
+}
+
+.rating-badge.rating-purple {
+  background: linear-gradient(135deg, #b893ff, #8458ff) !important;
+  color: #ffffff !important;
+}
+
+.marker-event-assist,
+.marker-event-save {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.42) !important;
+}
+
+.marker-event-assist small,
+.marker-event-save small {
+  color: #071018 !important;
+}
+
+.shot-zone-overlay {
+  background: rgba(158, 167, 181, 0.18);
+  border: 1px solid rgba(158, 167, 181, 0.16);
+}
+
+.shot-zone-overlay.is-active {
+  background: rgba(79, 173, 92, var(--zone-opacity));
+  border-color: rgba(111, 214, 126, 0.22);
+}
+
+.shot-zone-overlay strong {
+  color: #eff8f0;
+}
+
+.accuracy-ring-card .accuracy-ring-shell {
+  position: relative;
+  width: 84px;
+  height: 84px;
+}
+
+.accuracy-ring-card .accuracy-ring-center {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+}
+
+.accuracy-ring-card .accuracy-ring-center strong {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.shot-map-pitch {
+  max-width: 75%;
+}
+
+.shot-map-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.shot-map-icon .event-icon {
+  width: 25px;
+  height: 25px;
+}
+
+.site-footer {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 44px 24px;
+  grid-template-columns: 1.2fr 1fr;
+  background: linear-gradient(180deg, rgba(18, 23, 31, 0.98), rgba(22, 25, 31, 1));
+  border-top: 1px solid rgba(152, 174, 214, 0.12);
+}
+
+.footer-brand,
+.footer-nav {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.footer-brand {
+  align-content: start;
+  gap: 12px;
+}
+
+.footer-nav {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.footer-link {
+  padding: 8px 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.footer-link-mark {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1180px) {
+  .shot-map-pitch {
+    max-width: 100%;
+  }
+}
+
 .lineups-visual-widget,
 .shot-map-widget,
 .shot-zones-visual-widget,

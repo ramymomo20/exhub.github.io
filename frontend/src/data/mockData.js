@@ -1006,10 +1006,12 @@ export const quickStats = [
 ]
 
 export const homeFeatures = [
-  { label: 'Match of the Week', title: 'Aether FC vs Velora Athletic', description: 'A title match with extra-time drama, rivalry pressure, and MVP stakes.', action: '/matches/aether-vs-velora-final', accent: 'cyan' },
-  { label: 'Top Player', title: 'Naru is controlling the league', description: 'The current standard for overall impact, creativity, and biggest-game quality.', action: '/players/naru', accent: 'gold' },
-  { label: 'Tournament Finals', title: 'The cup cycle has reached the defining stage', description: 'The last match of the bracket now shapes legacies and future rankings.', action: '/tournaments/iosca-champions-cup', accent: 'purple' },
-  { label: 'Team Spotlight', title: 'Velora remain the most dangerous press-heavy side', description: 'Their transitions keep every knockout match chaotic and high leverage.', action: '/teams/velora-athletic', accent: 'blue' },
+  { label: 'Latest Match', title: 'Aether FC edged Velora Athletic in the latest final', description: 'Open the most recent big match and review the full lineup, shot map, and head to head breakdown.', action: '/matches/aether-vs-velora-final', accent: 'cyan' },
+  { label: 'Latest Tournament', title: 'IOSCA Champions Cup is the current prestige checkpoint', description: 'Review the most recent tournament table, leaders, fixtures, and final placement storylines.', action: '/tournaments/iosca-champions-cup', accent: 'purple' },
+  { label: 'Rankings', title: 'Track who is rising across players and teams', description: 'Compare top performers, team power levels, and head to head summaries in one place.', action: '/rankings', accent: 'blue' },
+  { label: 'Records', title: 'Historical records are the chase layer of the league', description: 'View the benchmarks for goals, assists, streaks, and landmark performances across IOSCA.', action: '/records', accent: 'gold' },
+  { label: 'Media', title: 'Highlights, clips, and screenshots keep the league alive', description: 'Browse uploads, compilations, and visual moments from across the IOSCA community.', action: '/media', accent: 'green' },
+  { label: 'Discord', title: 'The community lives in Discord between matchdays', description: 'Use the hub to bridge league data with the Discord community, announcements, and match chatter.', action: '/discord', accent: 'red' },
 ]
 
 export const teamOfWeek = [

@@ -318,13 +318,13 @@ export function ShotZoneMiniPitch({ zoneMap, team }) {
         {zones.map((zone) => (
           <div
             key={zone.id}
-            className="shot-zone-overlay"
+            className={`shot-zone-overlay${zone.percentage > 0 ? ' is-active' : ''}`}
             style={{
               left: `${zone.x}%`,
               top: `${zone.y}%`,
               width: `${zone.width}%`,
               height: `${zone.height}%`,
-              '--zone-opacity': Math.max(0.18, zone.percentage / 100),
+              '--zone-opacity': Math.max(0.12, zone.percentage / 100),
             }}
             title={`${zone.shots} shots | ${zone.goals} goals | Occupied longest by ${zone.occupant}`}
           >
