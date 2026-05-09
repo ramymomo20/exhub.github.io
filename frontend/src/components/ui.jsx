@@ -269,6 +269,7 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
           const ratingClass = getMatchRatingClass(entry.rating, entry.badges)
           const hoverClass = getPitchHoverClass(entry)
           const isMvp = entry.badges?.some((badge) => badge.type === 'mvp')
+          const avatarLabel = getPitchAvatarLabel(entry, player)
 
           return (
             <div
@@ -277,12 +278,13 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
               style={{ left: `${entry.x}%`, top: `${entry.y}%` }}
             >
               {entry.rating ? <span className={`pitch-rating ${ratingClass}`}>{entry.rating}</span> : null}
-              <div className={`pitch-shirt ${darkText ? 'pitch-shirt-dark' : ''}`} style={shirtStyle}>
-                <strong>{entry.role}</strong>
+              {isMvp ? <span className="pitch-mvp-crown" title="MVP">+</span> : null}
+              <div className={`pitch-avatar-marker ${darkText ? 'pitch-avatar-marker-dark' : ''}`} style={shirtStyle}>
+                <span>{avatarLabel}</span>
               </div>
+              <span className="pitch-role-label">{entry.role}</span>
               {player ? (
                 <Link className="pitch-player-name pitch-player-name-link" to={`/players/${player.id}`}>
-                  {isMvp ? <span className="mvp-badge" title="MVP">M</span> : null}
                   <span>{player.name}</span>
                 </Link>
               ) : (
@@ -437,6 +439,26 @@ function getPitchHoverClass(entry) {
   if (entry.y >= 68) classes.push('hover-up')
 
   return classes.join(' ')
+}
+
+function getPitchAvatarLabel(entry, player) {
+  const raw = player?.portrait || entry.player || entry.playerId || entry.role
+  const compact = String(raw).trim()
+
+  if (!compact) {
+    return '?'
+  }
+
+  if (compact.length <= 3) {
+    return compact.toUpperCase()
+  }
+
+  return compact
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] ?? '')
+    .join('')
+    .toUpperCase()
 }
 
 function isLightColor(hex) {

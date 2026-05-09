@@ -31,7 +31,7 @@ export function MatchDetailPage() {
         </div>
 
         <div className="match-hero-grid">
-          <div className="match-hero-team-column">
+          <div className="match-hero-team-column match-hero-team-column-left">
             <MatchHeroTeam team={homeTeam} isWinner={match.homeScore > match.awayScore} />
             <EventStack entries={match.homeEventStack} align="left" />
           </div>
@@ -49,9 +49,9 @@ export function MatchDetailPage() {
             </div>
           </div>
 
-          <div className="match-hero-team-column">
-            <MatchHeroTeam team={awayTeam} isWinner={match.awayScore > match.homeScore} />
+          <div className="match-hero-team-column match-hero-team-column-right">
             <EventStack entries={match.awayEventStack} align="right" />
+            <MatchHeroTeam team={awayTeam} isWinner={match.awayScore > match.homeScore} />
           </div>
         </div>
       </section>
@@ -160,17 +160,35 @@ function EventStack({ entries, align = 'left' }) {
     <div className={`event-stack event-stack-${align}`}>
       {filteredEntries.map((entry) => (
         <div key={`${entry.playerName}-${entry.grouped[0]?.type}-${entry.grouped[0]?.minutes}`} className="event-stack-row">
-          <div className="event-stack-player">
-            <strong>{entry.playerName}</strong>
-          </div>
-          <div className="event-stack-events">
-            {entry.grouped.map((group) => (
-              <span key={`${entry.playerName}-${group.type}-${group.minutes}`} className="event-stack-badge">
-                <EventIcon type={group.type} />
-                <small>{group.minutes}&apos;</small>
-              </span>
-            ))}
-          </div>
+          {align === 'right' ? (
+            <>
+              <div className="event-stack-events">
+                {entry.grouped.map((group) => (
+                  <span key={`${entry.playerName}-${group.type}-${group.minutes}`} className="event-stack-badge">
+                    <EventIcon type={group.type} />
+                    <small>{group.minutes}&apos;</small>
+                  </span>
+                ))}
+              </div>
+              <div className="event-stack-player">
+                <strong>{entry.playerName}</strong>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="event-stack-player">
+                <strong>{entry.playerName}</strong>
+              </div>
+              <div className="event-stack-events">
+                {entry.grouped.map((group) => (
+                  <span key={`${entry.playerName}-${group.type}-${group.minutes}`} className="event-stack-badge">
+                    <EventIcon type={group.type} />
+                    <small>{group.minutes}&apos;</small>
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       ))}
     </div>
