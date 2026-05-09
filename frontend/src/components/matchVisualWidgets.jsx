@@ -56,6 +56,46 @@ const HEAD_TO_HEAD_LABELS = [
   'Red Cards',
 ]
 
+const SHOT_ZONE_TEMPLATE = [
+  { x: 26, y: 18, width: 14, height: 24 },
+  { x: 42, y: 18, width: 18, height: 24 },
+  { x: 26, y: 46, width: 14, height: 22 },
+  { x: 42, y: 46, width: 18, height: 22 },
+  { x: 62, y: 46, width: 14, height: 22 },
+  { x: 76, y: 46, width: 14, height: 22 },
+]
+
+const PLAYER_STAT_COLUMNS = [
+  { key: 'player', label: 'Player' },
+  { key: 'position', label: 'Pos' },
+  { key: 'goals', label: 'G' },
+  { key: 'shots', label: 'SH' },
+  { key: 'onTarget', label: 'OT' },
+  { key: 'assists', label: 'A' },
+  { key: 'secondAssists', label: '2ND' },
+  { key: 'keyPasses', label: 'KP' },
+  { key: 'chancesCreated', label: 'CC' },
+  { key: 'passes', label: 'PAS' },
+  { key: 'completed', label: 'CMP' },
+  { key: 'completionPct', label: '%' },
+  { key: 'interceptions', label: 'INT' },
+  { key: 'possessions', label: 'POSS' },
+  { key: 'saves', label: 'SVS' },
+  { key: 'offsides', label: 'OFF' },
+  { key: 'distance', label: 'DIST' },
+  { key: 'fouls', label: 'FLS' },
+  { key: 'foulsSuffered', label: 'FLS S' },
+  { key: 'ownGoals', label: 'OG' },
+  { key: 'goalsConceded', label: 'GC' },
+  { key: 'corners', label: 'CRN' },
+  { key: 'throwIns', label: 'TI' },
+  { key: 'freeKicks', label: 'FK' },
+  { key: 'goalKicks', label: 'GK' },
+  { key: 'penalties', label: 'PEN' },
+  { key: 'yellowCards', label: 'YC' },
+  { key: 'redCards', label: 'RC' },
+]
+
 export function LineupsWidget({ match, homeTeam, awayTeam }) {
   const [viewMode, setViewMode] = useState('stats')
   const homePlayers = useMemo(() => buildLineupPlayers(match.lineups.home, match.format, match.lineupTooltips), [match])
@@ -65,7 +105,7 @@ export function LineupsWidget({ match, homeTeam, awayTeam }) {
     <Widget
       title="Lineups"
       className="span-full lineups-visual-widget"
-      action={
+      action={(
         <div className="widget-toggle-row">
           {['stats', 'titles'].map((mode) => (
             <button
@@ -78,7 +118,7 @@ export function LineupsWidget({ match, homeTeam, awayTeam }) {
             </button>
           ))}
         </div>
-      }
+      )}
     >
       <div className="lineups-widget-grid">
         <TeamLineupPitch
@@ -133,17 +173,19 @@ export function TeamLineupPitch({ team, players, score, format, mode }) {
 }
 
 export function PlayerMarker({ player, mode, teamColors }) {
+  const bottomBadges = mode === 'stats' ? buildBottomMarkerEvents(player.events) : []
+  const tooltipClass = player.isMvp ? ' player-marker-tooltip-mvp' : ''
+
   return (
-    <div className={`player-marker${mode === 'titles' ? ' is-title-view' : ''}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>
+    <div className={`player-marker${mode === 'titles' ? ' is-title-view' : ''}${player.isMvp ? ' is-mvp' : ''}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>
       <div className="player-marker-visual">
-        {mode === 'stats' ? <span className={`rating-badge ${getRatingBadgeClass(player.rating)}`}>{player.rating.toFixed(1)}</span> : null}
-        <div className="event-stack-vertical event-stack-left">
-          {mode === 'stats' ? renderEventStack(player.events, ['goal', 'assist', 'save']) : null}
-        </div>
-        <JerseyMarker teamColors={teamColors} position={player.position} />
-        <div className="event-stack-vertical event-stack-right">
-          {mode === 'stats' ? renderEventStack(player.events, ['yellow-card', 'second_yellow', 'red-card', 'own-goal']) : null}
-        </div>
+        <span className={`rating-badge ${getRatingBadgeClass(player.rating)}`}>{player.rating.toFixed(1)}</span>
+        {player.isMvp ? (
+          <span className="player-mvp-medal-badge" title="MVP">
+            <EventIcon type="mvp" />
+          </span>
+        ) : null}
+        <JerseyMarker teamColors={teamColors} position={player.position} isMvp={player.isMvp} />
       </div>
 
       {player.playerId ? (
@@ -154,10 +196,23 @@ export function PlayerMarker({ player, mode, teamColors }) {
         <span className="player-nameplate">{player.name}</span>
       )}
 
+      {bottomBadges.length ? (
+        <div className="player-bottom-events">
+          {bottomBadges.map((item) => (
+            <span key={`${player.id}-${item.type}`} className={`marker-event-badge marker-event-${item.type}`}>
+              <EventIcon type={item.iconType} />
+              <small>{item.count}</small>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       {player.tooltipLines.length ? (
-        <div className="player-marker-tooltip">
-          <strong>{player.name}</strong>
-          <span>{player.position}</span>
+        <div className={`player-marker-tooltip${tooltipClass}`}>
+          <div className="player-marker-tooltip-head">
+            <strong>{player.name}</strong>
+            <span>{player.position}</span>
+          </div>
           {player.tooltipLines.map((line) => (
             <small key={line}>{line}</small>
           ))}
@@ -167,7 +222,7 @@ export function PlayerMarker({ player, mode, teamColors }) {
   )
 }
 
-export function JerseyMarker({ teamColors, position }) {
+export function JerseyMarker({ teamColors, position, isMvp = false }) {
   const maskStyle = {
     WebkitMaskImage: `url(${JERSEY_ICON})`,
     maskImage: `url(${JERSEY_ICON})`,
@@ -176,7 +231,7 @@ export function JerseyMarker({ teamColors, position }) {
   }
 
   return (
-    <div className="jersey-marker">
+    <div className={`jersey-marker${isMvp ? ' is-mvp' : ''}`}>
       <span className="jersey-marker-body" style={maskStyle} />
       <span className="jersey-position-label">{position}</span>
     </div>
@@ -187,6 +242,10 @@ export function ShotMapWidget({ match, homeTeam, awayTeam }) {
   const [visibleTypes, setVisibleTypes] = useState(SHOT_FILTERS)
   const shots = match.shotMap ?? []
   const filteredShots = shots.filter((shot) => visibleTypes.includes(shot.type))
+  const teamNameLookup = {
+    [homeTeam.id]: homeTeam.name,
+    [awayTeam.id]: awayTeam.name,
+  }
 
   function toggleType(type) {
     setVisibleTypes((current) => (
@@ -201,7 +260,7 @@ export function ShotMapWidget({ match, homeTeam, awayTeam }) {
         <div className="pitch-watermark pitch-watermark-left">{homeTeam.crest}</div>
         <div className="pitch-watermark pitch-watermark-right">{awayTeam.crest}</div>
         {filteredShots.map((shot) => (
-          <ShotMapIcon key={shot.id} shot={shot} />
+          <ShotMapIcon key={shot.id} shot={shot} teamName={teamNameLookup[shot.teamId] ?? shot.teamId} />
         ))}
       </div>
 
@@ -210,14 +269,18 @@ export function ShotMapWidget({ match, homeTeam, awayTeam }) {
   )
 }
 
-export function ShotMapIcon({ shot }) {
+export function ShotMapIcon({ shot, teamName }) {
   return (
     <div
       className={`shot-map-icon shot-type-${shot.type}`}
       style={{ left: `${shot.x}%`, top: `${shot.y}%` }}
-      title={`${shot.playerName} · ${shot.minute}' · ${shot.type}`}
     >
       <EventIcon type={shot.type} />
+      <div className="shot-map-tooltip">
+        <strong>{shot.playerName}</strong>
+        <span>{teamName}</span>
+        <small>{shot.minute}' | {formatEventLabel(shot.type)}</small>
+      </div>
     </div>
   )
 }
@@ -259,6 +322,8 @@ export function ShotZonesWidget({ match, homeTeam, awayTeam }) {
 }
 
 export function ShotZoneMiniPitch({ zoneMap, team }) {
+  const zones = buildShotZoneLayout(zoneMap.zones ?? [])
+
   return (
     <article className="shot-zone-mini card">
       <header className="shot-zone-summary">
@@ -268,9 +333,9 @@ export function ShotZoneMiniPitch({ zoneMap, team }) {
         <span>{zoneMap.conversion}% conv.</span>
       </header>
 
-      <div className="analytics-pitch analytics-pitch-horizontal analytics-pitch-mini">
-        <PitchLines orientation="horizontal" mini />
-        {zoneMap.zones.map((zone) => (
+      <div className="analytics-pitch analytics-pitch-horizontal analytics-pitch-mini analytics-pitch-attacking-third">
+        <PitchLines orientation="zone" mini />
+        {zones.map((zone) => (
           <div
             key={zone.id}
             className="shot-zone-overlay"
@@ -279,7 +344,7 @@ export function ShotZoneMiniPitch({ zoneMap, team }) {
               top: `${zone.y}%`,
               width: `${zone.width}%`,
               height: `${zone.height}%`,
-              '--zone-opacity': Math.max(0.14, zone.percentage / 100),
+              '--zone-opacity': Math.max(0.18, zone.percentage / 100),
             }}
           >
             <strong>{zone.percentage}%</strong>
@@ -319,18 +384,20 @@ export function CircularAccuracyRing({ label, value, color }) {
 
   return (
     <div className="accuracy-ring-card">
-      <svg viewBox="0 0 84 84" className="accuracy-ring">
-        <circle cx="42" cy="42" r={radius} className="accuracy-ring-track" />
-        <circle
-          cx="42"
-          cy="42"
-          r={radius}
-          className="accuracy-ring-progress"
-          style={{ stroke: color, strokeDasharray: circumference, strokeDashoffset: dashOffset }}
-        />
-      </svg>
-      <div className="accuracy-ring-center">
-        <strong>{Math.round(clampedValue)}%</strong>
+      <div className="accuracy-ring-shell">
+        <svg viewBox="0 0 84 84" className="accuracy-ring">
+          <circle cx="42" cy="42" r={radius} className="accuracy-ring-track" />
+          <circle
+            cx="42"
+            cy="42"
+            r={radius}
+            className="accuracy-ring-progress"
+            style={{ stroke: color, strokeDasharray: circumference, strokeDashoffset: dashOffset }}
+          />
+        </svg>
+        <div className="accuracy-ring-center">
+          <strong>{Math.round(clampedValue)}%</strong>
+        </div>
       </div>
       <span>{label}</span>
     </div>
@@ -360,18 +427,84 @@ export function MirroredStatBar({ row }) {
   )
 }
 
+export function FullPlayerStatsWidget({ match, homeTeam, awayTeam }) {
+  const homeRows = useMemo(() => buildMatchPlayerStatRows(match, 'home'), [match])
+  const awayRows = useMemo(() => buildMatchPlayerStatRows(match, 'away'), [match])
+
+  return (
+    <Widget title="Full Player Stats" className="span-full full-player-stats-widget">
+      <div className="player-stats-widget-grid">
+        <TeamStatsTable team={homeTeam} rows={homeRows} />
+        <TeamStatsTable team={awayTeam} rows={awayRows} />
+      </div>
+    </Widget>
+  )
+}
+
+function TeamStatsTable({ team, rows }) {
+  return (
+    <article className="team-player-stats-card">
+      <header className="team-player-stats-head">
+        <div className="team-lineup-title">
+          <Crest teamId={team.id} />
+          <div>
+            <strong>{team.name}</strong>
+            <small>Match player stats</small>
+          </div>
+        </div>
+      </header>
+
+      <div className="player-stats-table-shell">
+        <table className="player-stats-table-compact">
+          <thead>
+            <tr>
+              {PLAYER_STAT_COLUMNS.map((column) => (
+                <th key={column.key}>{column.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                {PLAYER_STAT_COLUMNS.map((column) => (
+                  <td key={`${row.id}-${column.key}`}>{row[column.key]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  )
+}
+
 function PitchLines({ orientation, mini = false }) {
   if (orientation === 'horizontal') {
     return (
       <>
         <div className="analytics-pitch-halfway analytics-pitch-halfway-horizontal" />
         <div className={`analytics-pitch-circle${mini ? ' is-mini' : ''}`} />
+        <div className="analytics-pitch-center-spot analytics-pitch-center-spot-horizontal" />
         <div className={`analytics-pitch-box analytics-pitch-box-left${mini ? ' is-mini' : ''}`} />
         <div className={`analytics-pitch-box analytics-pitch-box-right${mini ? ' is-mini' : ''}`} />
         <div className={`analytics-pitch-goal-box analytics-pitch-goal-box-left${mini ? ' is-mini' : ''}`} />
         <div className={`analytics-pitch-goal-box analytics-pitch-goal-box-right${mini ? ' is-mini' : ''}`} />
+        <div className="analytics-pitch-goal-frame analytics-pitch-goal-frame-left" />
+        <div className="analytics-pitch-goal-frame analytics-pitch-goal-frame-right" />
         <div className="analytics-pitch-spot analytics-pitch-spot-left" />
         <div className="analytics-pitch-spot analytics-pitch-spot-right" />
+      </>
+    )
+  }
+
+  if (orientation === 'zone') {
+    return (
+      <>
+        <div className="analytics-pitch-zone-box" />
+        <div className="analytics-pitch-zone-goal-box" />
+        <div className="analytics-pitch-zone-goal-frame" />
+        <div className="analytics-pitch-zone-spot" />
+        <div className="analytics-pitch-zone-arc" />
       </>
     )
   }
@@ -380,10 +513,13 @@ function PitchLines({ orientation, mini = false }) {
     <>
       <div className="analytics-pitch-halfway analytics-pitch-halfway-vertical" />
       <div className={`analytics-pitch-circle${mini ? ' is-mini' : ''}`} />
+      <div className="analytics-pitch-center-spot analytics-pitch-center-spot-vertical" />
       <div className={`analytics-pitch-box analytics-pitch-box-top${mini ? ' is-mini' : ''}`} />
       <div className={`analytics-pitch-box analytics-pitch-box-bottom${mini ? ' is-mini' : ''}`} />
       <div className={`analytics-pitch-goal-box analytics-pitch-goal-box-top${mini ? ' is-mini' : ''}`} />
       <div className={`analytics-pitch-goal-box analytics-pitch-goal-box-bottom${mini ? ' is-mini' : ''}`} />
+      <div className="analytics-pitch-goal-frame analytics-pitch-goal-frame-top" />
+      <div className="analytics-pitch-goal-frame analytics-pitch-goal-frame-bottom" />
       <div className="analytics-pitch-spot analytics-pitch-spot-top" />
       <div className="analytics-pitch-spot analytics-pitch-spot-bottom" />
     </>
@@ -407,6 +543,7 @@ function buildLineupPlayers(lineup = [], format, tooltipLookup = {}) {
     const player = source?.playerId ? getPlayerById(source.playerId) : null
     const name = player?.name ?? source?.player ?? `Starter ${slotIndex + 1}`
     const id = source?.playerId ?? `${slot.position}-${slotIndex}`
+    const badges = source?.badges ?? []
 
     return {
       id,
@@ -416,14 +553,18 @@ function buildLineupPlayers(lineup = [], format, tooltipLookup = {}) {
       rating: typeof source?.rating === 'number' ? source.rating : 0,
       x: slot.x,
       y: slot.y,
-      events: badgesToEvents(source?.badges ?? []),
+      isMvp: badges.some((badge) => badge.type === 'mvp'),
+      events: badgesToEvents(badges),
       tooltipLines: source?.playerId ? (tooltipLookup[source.playerId] ?? []) : [],
     }
   })
 }
 
 function badgesToEvents(badges = []) {
-  const byType = Object.fromEntries(badges.map((badge) => [badge.type, badge.count]))
+  const byType = badges.reduce((accumulator, badge) => {
+    accumulator[badge.type] = (accumulator[badge.type] ?? 0) + (badge.count ?? 1)
+    return accumulator
+  }, {})
 
   return {
     goals: byType.goal ?? 0,
@@ -436,17 +577,16 @@ function badgesToEvents(badges = []) {
   }
 }
 
-function renderEventStack(events, kinds) {
-  const items = kinds
-    .map((kind) => toEventBadgeData(kind, events))
-    .filter(Boolean)
-
-  return items.map((item) => (
-    <span key={item.type} className={`marker-event-badge marker-event-${item.type}`}>
-      <EventIcon type={item.iconType} />
-      <small>{item.count}</small>
-    </span>
-  ))
+function buildBottomMarkerEvents(events) {
+  return [
+    toEventBadgeData('goal', events),
+    toEventBadgeData('assist', events),
+    toEventBadgeData('save', events),
+    toEventBadgeData('yellow-card', events),
+    toEventBadgeData('second_yellow', events),
+    toEventBadgeData('red-card', events),
+    toEventBadgeData('own-goal', events),
+  ].filter(Boolean)
 }
 
 function toEventBadgeData(kind, events) {
@@ -476,9 +616,18 @@ function getRatingBadgeClass(rating) {
 
 function formatEventLabel(type) {
   return type
+    .replaceAll('_', '-')
     .split('-')
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+function buildShotZoneLayout(zones) {
+  return zones.slice(0, SHOT_ZONE_TEMPLATE.length).map((zone, index) => ({
+    ...SHOT_ZONE_TEMPLATE[index],
+    id: zone.id,
+    percentage: zone.percentage,
+  }))
 }
 
 function buildFallbackShotZoneMaps(match, homeTeam, awayTeam) {
@@ -492,9 +641,11 @@ function buildFallbackShotZoneMaps(match, homeTeam, awayTeam) {
       goals: match.homeScore,
       conversion: toConversion(match.homeScore, homeShots),
       zones: [
-        { id: 'left-box', x: 16, y: 46, width: 16, height: 20, percentage: 24 },
-        { id: 'center-box', x: 37, y: 38, width: 22, height: 28, percentage: 32 },
-        { id: 'right-box', x: 63, y: 46, width: 16, height: 20, percentage: 19 },
+        { id: 'left-high', percentage: 20 },
+        { id: 'center-high', percentage: 10 },
+        { id: 'left-low', percentage: 30 },
+        { id: 'center-low', percentage: 10 },
+        { id: 'right-low', percentage: 30 },
       ],
     },
     away: {
@@ -503,9 +654,12 @@ function buildFallbackShotZoneMaps(match, homeTeam, awayTeam) {
       goals: match.awayScore,
       conversion: toConversion(match.awayScore, awayShots),
       zones: [
-        { id: 'left-box', x: 16, y: 46, width: 16, height: 20, percentage: 18 },
-        { id: 'center-box', x: 37, y: 38, width: 22, height: 28, percentage: 28 },
-        { id: 'right-box', x: 63, y: 46, width: 16, height: 20, percentage: 21 },
+        { id: 'left-high', percentage: 14 },
+        { id: 'center-high', percentage: 29 },
+        { id: 'left-low', percentage: 14 },
+        { id: 'center-low', percentage: 14 },
+        { id: 'right-low', percentage: 14 },
+        { id: 'right-wide', percentage: 14 },
       ],
     },
   }
@@ -529,8 +683,8 @@ function buildHeadToHeadModel(match) {
   const awayPasses = getComparisonValue(match.comparisonStats, 'Passes', 'away') || inferAttempts(awayPassCompleted, awayPassAccuracy)
   const homeSaves = Math.max(0, awayShotsOnGoal - match.awayScore)
   const awaySaves = Math.max(0, homeShotsOnGoal - match.homeScore)
-  const homeYellowCards = countLineupEvent(match.lineups.home, 'yellow-card')
-  const awayYellowCards = countLineupEvent(match.lineups.away, 'yellow-card')
+  const homeYellowCards = countLineupEvent(match.lineups.home, 'yellow-card') + countLineupEvent(match.lineups.home, 'second_yellow')
+  const awayYellowCards = countLineupEvent(match.lineups.away, 'yellow-card') + countLineupEvent(match.lineups.away, 'second_yellow')
   const homeRedCards = countLineupEvent(match.lineups.home, 'red-card')
   const awayRedCards = countLineupEvent(match.lineups.away, 'red-card')
 
@@ -572,6 +726,170 @@ function buildHeadToHeadModel(match) {
     awayPassAccuracy,
     rows,
   }
+}
+
+function buildMatchPlayerStatRows(match, side) {
+  const isHome = side === 'home'
+  const lineup = isHome ? match.lineups.home : match.lineups.away
+  const goalsConceded = isHome ? match.awayScore : match.homeScore
+  const performances = match.performances ?? []
+
+  return lineup.map((entry, index) => {
+    const player = entry.playerId ? getPlayerById(entry.playerId) : null
+    const seasonStats = player?.stats ?? {}
+    const performance = performances.find((item) => item.playerId && item.playerId === entry.playerId) ?? {}
+    const badges = badgesToEvents(entry.badges ?? [])
+    const position = normalizeRole(entry.role)
+    const rating = Number(entry.rating ?? 7)
+    const passes = derivePasses(position, rating, seasonStats)
+    const completionPct = deriveCompletionPct(position, seasonStats)
+    const completed = Math.min(passes, Math.round(passes * (completionPct / 100)))
+    const goals = performance.goals ?? badges.goals
+    const assists = performance.assists ?? badges.assists
+    const saves = performance.saves ?? badges.saves
+    const shots = deriveShots(position, rating, goals, assists)
+    const onTarget = Math.min(shots, Math.max(goals, Math.round(shots * 0.6)))
+    const secondAssists = goals === 0 && assists > 0 ? 1 : Math.min(1, Math.round((seasonStats.secondAssists ?? 0) / 12))
+    const keyPasses = Math.max(assists, Math.round(passes * (position === 'GK' ? 0.03 : 0.08)))
+    const chancesCreated = Math.max(assists, keyPasses - (position === 'GK' ? 0 : 1))
+    const interceptions = performance.interceptions ?? deriveInterceptions(position, rating)
+    const possessions = derivePossessions(position, rating)
+    const offsides = position === 'CF' || position === 'LW' || position === 'RW' || position === 'LM' || position === 'RM' ? Math.max(0, Math.round((rating - 6.5) / 1.5)) : 0
+    const distance = `${deriveDistance(position, rating).toFixed(2)}km`
+    const fouls = deriveFouls(position)
+    const foulsSuffered = Math.max(0, assists + Math.round(rating / 4) - 1)
+    const ownGoals = badges.ownGoals
+    const yellowCards = badges.yellowCards + badges.secondYellowCards
+    const redCards = badges.redCards
+    const corners = ['LW', 'RW', 'LM', 'RM', 'CM'].includes(position) ? assists + (goals > 0 ? 1 : 0) : 0
+    const throwIns = ['LB', 'RB'].includes(position) ? 2 : 0
+    const freeKicks = ['CM', 'CF', 'LW', 'RW'].includes(position) ? Math.max(0, assists) : 0
+    const goalKicks = position === 'GK' ? Math.max(2, goalsConceded + 2) : 0
+    const penalties = goals > 0 && position === 'CF' ? 1 : 0
+
+    return {
+      id: `${side}-${entry.playerId ?? entry.player ?? index}`,
+      player: player?.name ?? entry.player ?? `Starter ${index + 1}`,
+      position,
+      goals,
+      shots,
+      onTarget,
+      assists,
+      secondAssists,
+      keyPasses,
+      chancesCreated,
+      passes,
+      completed,
+      completionPct: `${completionPct}%`,
+      interceptions,
+      possessions,
+      saves,
+      offsides,
+      distance,
+      fouls,
+      foulsSuffered,
+      ownGoals,
+      goalsConceded: position === 'GK' ? goalsConceded : 0,
+      corners,
+      throwIns,
+      freeKicks,
+      goalKicks,
+      penalties,
+      yellowCards,
+      redCards,
+    }
+  })
+}
+
+function derivePasses(position, rating, seasonStats) {
+  if (seasonStats.passesCompleted) {
+    const baseline = seasonStats.passesCompleted / Math.max(1, seasonStats.appearances ?? 1)
+    return Math.max(12, Math.round(baseline))
+  }
+
+  const byRole = {
+    GK: 18,
+    LB: 24,
+    CB: 26,
+    RB: 24,
+    CM: 30,
+    LM: 22,
+    RM: 22,
+    LW: 21,
+    RW: 21,
+    CF: 18,
+  }
+
+  return Math.max(12, Math.round((byRole[position] ?? 20) + (rating - 7) * 3))
+}
+
+function deriveCompletionPct(position, seasonStats) {
+  if (seasonStats.passAccuracy) {
+    return Math.round(seasonStats.passAccuracy)
+  }
+
+  const byRole = {
+    GK: 82,
+    LB: 80,
+    CB: 83,
+    RB: 80,
+    CM: 86,
+    LM: 79,
+    RM: 79,
+    LW: 76,
+    RW: 76,
+    CF: 74,
+  }
+
+  return byRole[position] ?? 78
+}
+
+function deriveShots(position, rating, goals, assists) {
+  const base = ['CF', 'LW', 'RW', 'LM', 'RM'].includes(position) ? 3 : position === 'CM' ? 2 : 1
+  return Math.max(goals, base + Math.max(0, Math.round(rating - 7)) + assists)
+}
+
+function deriveInterceptions(position, rating) {
+  const base = {
+    GK: 0,
+    LB: 4,
+    CB: 6,
+    RB: 4,
+    CM: 5,
+    LM: 2,
+    RM: 2,
+    LW: 1,
+    RW: 1,
+    CF: 1,
+  }
+
+  return Math.max(0, (base[position] ?? 2) + Math.round((rating - 7) * 2))
+}
+
+function derivePossessions(position, rating) {
+  const base = ['CF', 'LW', 'RW'].includes(position) ? 9 : ['CM', 'LM', 'RM'].includes(position) ? 7 : ['LB', 'CB', 'RB'].includes(position) ? 5 : 3
+  return Math.max(1, base + Math.round((rating - 7) * 1.5))
+}
+
+function deriveDistance(position, rating) {
+  const base = {
+    GK: 1.9,
+    LB: 6.9,
+    CB: 6.4,
+    RB: 6.9,
+    CM: 7.8,
+    LM: 7.3,
+    RM: 7.3,
+    LW: 7.1,
+    RW: 7.1,
+    CF: 6.7,
+  }
+
+  return Math.max(1.5, (base[position] ?? 6.2) + (rating - 7) * 0.32)
+}
+
+function deriveFouls(position) {
+  return ['CB', 'LB', 'RB'].includes(position) ? 1 : 0
 }
 
 function getComparisonValue(rows, label, side) {

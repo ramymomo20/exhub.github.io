@@ -1,6 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Crest, EventIcon, PageTrail, PlayerInlineLink, Widget } from '../components/ui'
-import { HeadToHeadWidget, LineupsWidget, ShotMapWidget, ShotZonesWidget } from '../components/matchVisualWidgets'
+import { FullPlayerStatsWidget, HeadToHeadWidget, LineupsWidget, ShotMapWidget, ShotZonesWidget } from '../components/matchVisualWidgets'
 import { getMatchById, getPlayerById, getTeamById } from '../data/repository'
 
 export function MatchDetailPage() {
@@ -75,6 +75,8 @@ export function MatchDetailPage() {
             ))}
           </div>
         </Widget>
+
+        <FullPlayerStatsWidget match={match} homeTeam={homeTeam} awayTeam={awayTeam} />
       </section>
     </div>
   )
