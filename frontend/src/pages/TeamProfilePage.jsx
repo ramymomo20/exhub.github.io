@@ -16,13 +16,14 @@ export function TeamProfilePage() {
   const latestTournament = listTournaments().find((tournament) => tournament.id === 'iosca-premier-season')
   const aggregated = buildTeamStatistics(squad)
   const captain = getPlayerById(squad.find((player) => player.name === team.captain)?.id ?? '')
+  const groupedSquad = groupSquadByUnit(squad)
 
   return (
     <div className="page-stack">
       <PageTrail items={[{ label: 'Home', to: '/' }, { label: 'Teams', to: '/teams' }, { label: team.name }]} />
 
       <section className="team-hero card team-hero-reworked">
-        <div className="team-hero-crest team-hero-crest-large">
+        <div className={`team-hero-crest team-hero-crest-large team-hero-crest-rated ${getRatingToneClass(team.avgRating)}`}>
           <span className="eyebrow team-hero-eyebrow">Team Profile</span>
           <span className={`profile-big-badge team-profile-rating-badge ${getRatingToneClass(team.avgRating)}`}>{team.avgRating.toFixed(1)}</span>
           <Crest teamId={team.id} large />
@@ -51,9 +52,16 @@ export function TeamProfilePage() {
 
       <section className="dashboard-grid">
         <Widget title="Squad Preview" className="span-two">
-          <div className="horizontal-rail">
-            {squad.map((player) => (
-              <PlayerBadge key={player.id} player={player} compact />
+          <div className="squad-preview-groups">
+            {Object.entries(groupedSquad).map(([label, players]) => (
+              <div key={label} className="squad-preview-group">
+                <strong>{label}</strong>
+                <div className="horizontal-rail horizontal-rail-tight">
+                  {players.map((player) => (
+                    <PlayerBadge key={player.id} player={player} compact />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </Widget>
@@ -212,4 +220,25 @@ function TeamStatSection({ title, items }) {
       </div>
     </div>
   )
+}
+
+function groupSquadByUnit(squad) {
+  const groups = {
+    GK: [],
+    DEF: [],
+    MID: [],
+    ATK: [],
+  }
+
+  squad
+    .slice()
+    .sort((left, right) => right.rating - left.rating)
+    .forEach((player) => {
+      if (player.position === 'GK') groups.GK.push(player)
+      else if (['LB', 'CB', 'RB'].includes(player.position)) groups.DEF.push(player)
+      else if (['CM', 'LM', 'RM'].includes(player.position)) groups.MID.push(player)
+      else groups.ATK.push(player)
+    })
+
+  return groups
 }

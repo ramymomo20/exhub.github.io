@@ -99,25 +99,18 @@ function MatchHeroTeam({ team, isWinner = false }) {
 
 function EventStack({ entries, align = 'left' }) {
   const filteredEntries = entries
-    .map((entry) => {
-      const grouped = groupKeyEvents(entry.events)
-      return grouped.length ? { ...entry, grouped } : null
-    })
+    .flatMap((entry) => groupKeyEvents(entry.events).map((group) => ({ playerName: entry.playerName, group })))
     .filter(Boolean)
 
   return (
     <div className={`event-stack event-stack-${align}`}>
       {filteredEntries.map((entry) => (
-        <div key={`${entry.playerName}-${entry.grouped[0]?.type}-${entry.grouped[0]?.minutes}`} className="event-stack-row">
+        <div key={`${entry.playerName}-${entry.group.type}-${entry.group.minutes}`} className="event-stack-row event-stack-row-plain">
           {align === 'right' ? (
             <>
-              <div className="event-stack-events">
-                {entry.grouped.map((group) => (
-                  <span key={`${entry.playerName}-${group.type}-${group.minutes}`} className="event-stack-badge">
-                    <EventIcon type={group.type} />
-                    <small>{group.minutes}&apos;</small>
-                  </span>
-                ))}
+              <div className="event-stack-events event-stack-events-inline">
+                <EventIcon type={entry.group.type} />
+                <small>{formatMinutes(entry.group.minutes)}</small>
               </div>
               <div className="event-stack-player">
                 <strong>{entry.playerName}</strong>
@@ -128,13 +121,9 @@ function EventStack({ entries, align = 'left' }) {
               <div className="event-stack-player">
                 <strong>{entry.playerName}</strong>
               </div>
-              <div className="event-stack-events">
-                {entry.grouped.map((group) => (
-                  <span key={`${entry.playerName}-${group.type}-${group.minutes}`} className="event-stack-badge">
-                    <EventIcon type={group.type} />
-                    <small>{group.minutes}&apos;</small>
-                  </span>
-                ))}
+              <div className="event-stack-events event-stack-events-inline">
+                <EventIcon type={entry.group.type} />
+                <small>{formatMinutes(entry.group.minutes)}</small>
               </div>
             </>
           )}
@@ -145,7 +134,7 @@ function EventStack({ entries, align = 'left' }) {
 }
 
 function groupKeyEvents(events = []) {
-  const allowed = ['goal', 'own-goal', 'yellow-card', 'red-card']
+  const allowed = ['goal', 'own-goal', 'yellow-card', 'second_yellow', 'red-card']
   const groups = new Map()
 
   events
@@ -158,8 +147,12 @@ function groupKeyEvents(events = []) {
 
   return Array.from(groups.entries()).map(([type, minutes]) => ({
     type,
-    minutes: minutes.join(', '),
+    minutes,
   }))
+}
+
+function formatMinutes(minutes) {
+  return minutes.map((minute) => `${minute}'`).join(', ')
 }
 
 function formatHighlightText(item) {

@@ -14,6 +14,12 @@ const navItems = [
 
 export function AppShell() {
   const brandIcon = `${import.meta.env.BASE_URL}icons/iosca-icon.png`
+  const socialLinks = [
+    { href: '/', label: 'About', icon: 'A', internal: true },
+    { href: '/discord', label: 'Discord', icon: 'D', internal: true },
+    { href: 'https://github.com/ramymomo20/exhub.github-io', label: 'GitHub', icon: 'GH' },
+    { href: 'https://store.steampowered.com/app/673560/IOSoccer/', label: 'Steam', icon: 'ST' },
+  ]
 
   return (
     <div className="site-shell">
@@ -54,6 +60,28 @@ export function AppShell() {
       <main className="page-wrap">
         <Outlet />
       </main>
+
+      <footer className="site-footer">
+        <div className="footer-brand">
+          <strong>IOSoccer Central America</strong>
+          <p>All rights reserved.</p>
+        </div>
+        <div className="footer-nav">
+          {socialLinks.map((link) => (
+            link.internal ? (
+              <NavLink key={link.label} className="footer-link footer-link-icon" to={link.href}>
+                <span className="footer-link-mark">{link.icon}</span>
+                <span>{link.label}</span>
+              </NavLink>
+            ) : (
+              <a key={link.label} className="footer-link footer-link-icon" href={link.href} target="_blank" rel="noreferrer">
+                <span className="footer-link-mark">{link.icon}</span>
+                <span>{link.label}</span>
+              </a>
+            )
+          ))}
+        </div>
+      </footer>
     </div>
   )
 }

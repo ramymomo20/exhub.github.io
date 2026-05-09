@@ -1031,12 +1031,12 @@ export const records = [
 ]
 
 export const media = [
-  { id: 'm1', title: 'Final whistle chaos', type: 'Highlight', length: '00:42', accent: 'cyan' },
-  { id: 'm2', title: 'Naru outside-foot winner', type: 'Goal Clip', length: '00:18', accent: 'gold' },
-  { id: 'm3', title: 'Velora press montage', type: 'Team Feature', length: '01:22', accent: 'purple' },
-  { id: 'm4', title: 'Top saves of the week', type: 'Compilation', length: '02:03', accent: 'green' },
-  { id: 'm5', title: 'Rivalry night gallery', type: 'Screenshots', length: '12 stills', accent: 'red' },
-  { id: 'm6', title: 'Hall of Fame opening reel', type: 'Broadcast Intro', length: '00:55', accent: 'blue' },
+  { id: 'm1', title: 'Final whistle chaos', type: 'Highlight', group: 'highlights', length: '00:42', lengthBucket: 'short', accent: 'cyan', uploader: 'Naru', assetUrl: '#' },
+  { id: 'm2', title: 'Naru outside-foot winner', type: 'Goal Clip', group: 'goal-clips', length: '00:18', lengthBucket: 'short', accent: 'gold', uploader: 'Cross', assetUrl: '#' },
+  { id: 'm3', title: 'Velora press montage', type: 'Team Feature', group: 'highlights', length: '01:22', lengthBucket: 'medium', accent: 'purple', uploader: 'Mika', assetUrl: '#' },
+  { id: 'm4', title: 'Top saves of the week', type: 'Compilation', group: 'compilations', length: '02:03', lengthBucket: 'long', accent: 'green', uploader: 'Clixy', assetUrl: '#' },
+  { id: 'm5', title: 'Rivalry night gallery', type: 'Screenshots', group: 'screenshots', length: '12 stills', lengthBucket: 'medium', accent: 'red', uploader: 'Jae', assetUrl: '#' },
+  { id: 'm6', title: 'Hall of Fame opening reel', type: 'Broadcast Intro', group: 'compilations', length: '00:55', lengthBucket: 'short', accent: 'blue', uploader: 'Admin', assetUrl: '#' },
 ]
 
 export const discordOverview = {

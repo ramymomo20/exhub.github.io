@@ -358,12 +358,6 @@ export function FormPills({ values }) {
 }
 
 const FORMATIONS = {
-  '4v4': [
-    { pos: 'GK', x: 50, y: 84 },
-    { pos: 'CB', x: 50, y: 62 },
-    { pos: 'LM', x: 26, y: 28 },
-    { pos: 'RM', x: 74, y: 28 },
-  ],
   '5v5': [
     { pos: 'GK', x: 50, y: 84 },
     { pos: 'CB', x: 50, y: 64 },

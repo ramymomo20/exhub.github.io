@@ -95,10 +95,24 @@ export function RankingsPage() {
               {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
             </select>
           </div>
-          <div className="comparison-row comparison-row-standalone comparison-card">
-            <div><TeamInlineLink teamId={teamHome?.id} compact /></div>
-            <span>Last 5 meetings | 2 wins each | 1 draw</span>
-            <div><TeamInlineLink teamId={teamAway?.id} compact /></div>
+          <div className="comparison-card comparison-card-team">
+            <div className="comparison-card-team-side">
+              <TeamInlineLink teamId={teamHome?.id} compact />
+            </div>
+            <div className="comparison-card-team-center">
+              <strong>Last 5 meetings</strong>
+              <small>2 wins each | 1 draw</small>
+            </div>
+            <div className="comparison-card-team-side">
+              <TeamInlineLink teamId={teamAway?.id} compact />
+            </div>
+          </div>
+          <div className="comparison-grid">
+            <div className="comparison-row comparison-row-standalone"><strong>{teamHome?.avgRating?.toFixed(1)}</strong><span>Average rating</span><strong>{teamAway?.avgRating?.toFixed(1)}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{Math.round((teamHome?.wins / teamHome?.appearances) * 100) || 0}%</strong><span>Win rate</span><strong>{Math.round((teamAway?.wins / teamAway?.appearances) * 100) || 0}%</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{teamHome?.wins}</strong><span>Overall wins</span><strong>{teamAway?.wins}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>7</strong><span>Meetings played</span><strong>7</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>9</strong><span>Goals in meetings</span><strong>8</strong></div>
           </div>
         </Widget>
 
@@ -114,8 +128,15 @@ export function RankingsPage() {
           <div className="comparison-grid">
             <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.goals}</strong><span>Goals</span><strong>{playerRight?.stats.goals}</strong></div>
             <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.assists}</strong><span>Assists</span><strong>{playerRight?.stats.assists}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.secondAssists}</strong><span>2nd assists</span><strong>{playerRight?.stats.secondAssists}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.apasses}</strong><span>Passes</span><strong>{playerRight?.stats.apasses}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.passAccuracy}%</strong><span>Pass completion</span><strong>{playerRight?.stats.passAccuracy}%</strong></div>
             <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.interceptions}</strong><span>Interceptions</span><strong>{playerRight?.stats.interceptions}</strong></div>
-            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.yellowCards}</strong><span>Discipline</span><strong>{playerRight?.stats.yellowCards}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.saves}</strong><span>Saves</span><strong>{playerRight?.stats.saves}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.shots}</strong><span>Shots</span><strong>{playerRight?.stats.shots}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.shotAccuracy}%</strong><span>Shot accuracy</span><strong>{playerRight?.stats.shotAccuracy}%</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.fouls}</strong><span>Fouls</span><strong>{playerRight?.stats.fouls}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{playerLeft?.stats.yellowCards}</strong><span>Yellow cards</span><strong>{playerRight?.stats.yellowCards}</strong></div>
           </div>
         </Widget>
       </section>

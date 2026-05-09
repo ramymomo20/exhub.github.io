@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { PageTrail, StatChip, TeamInlineLink, Widget } from '../components/ui'
+import { FormPills, PageTrail, StatChip, TeamInlineLink, Widget } from '../components/ui'
 import { getPlayerById, getPlayerPerformance, listPlayerMatchLogs } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
@@ -23,10 +23,16 @@ export function PlayerProfilePage() {
       <section className="profile-hero card profile-hero-reworked">
         <div className="profile-portrait-column">
           <div className="profile-top-badges">
-            <span className={`profile-big-badge ${getRatingToneClass(player.rating)}`}>{player.rating}</span>
-            <span className="profile-big-badge profile-position-badge">{player.position}</span>
+            <div className="profile-badge-stack">
+              <small>OVR</small>
+              <span className={`profile-big-badge ${getRatingToneClass(player.rating)}`}>{player.rating}</span>
+            </div>
+            <div className="profile-badge-stack">
+              <small>POS</small>
+              <span className="profile-big-badge profile-position-badge">{player.position}</span>
+            </div>
           </div>
-          <div className="profile-portrait">{player.portrait}</div>
+          <div className={`profile-portrait profile-portrait-rated ${getRatingToneClass(player.rating)}`}>{player.portrait}</div>
         </div>
 
         <div className="profile-center">
@@ -34,6 +40,10 @@ export function PlayerProfilePage() {
           <h1>{player.name}</h1>
           <div className="profile-badges">
             <TeamInlineLink teamId={player.teamId} />
+            <FormPills values={getPlayerForm(matchLogs, player.id)} />
+            <a className="steam-redirect-badge" href={`https://steamcommunity.com/id/${player.id}`} target="_blank" rel="noreferrer" aria-label="Open Steam profile">
+              <span>↗</span>
+            </a>
           </div>
           <div className="profile-focus-grid">
             <div className="profile-focus-card">
@@ -78,6 +88,10 @@ export function PlayerProfilePage() {
 
         <Widget title="Activity Map">
           <ActivityMap values={player.activity} />
+        </Widget>
+
+        <Widget title="Rating Change">
+          <RatingTrendChart values={buildRatingHistory(player)} />
         </Widget>
 
         <Widget title="Statistics" className="span-full">
@@ -182,9 +196,14 @@ export function PlayerProfilePage() {
 
 function ActivityMap({ values }) {
   const cells = buildActivityCells(values)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
     <div className="activity-map-shell">
+      <div className="activity-map-axis-top">
+        {months.map((month) => <span key={month}>{month}</span>)}
+      </div>
       <div className="activity-map-legend">
         <span>Low</span>
         <div className="activity-map-legend-scale">
@@ -196,15 +215,20 @@ function ActivityMap({ values }) {
       </div>
 
       <div className="activity-map-scroll">
-        <div className="activity-map-year">
-          {cells.map((cell) => (
-            <span
-              key={cell.date}
-              className={`activity-cell level-${cell.level}`}
-              title={`${cell.label}: ${cell.value} matches`}
-              aria-label={`${cell.label}: ${cell.value} matches`}
-            />
-          ))}
+        <div className="activity-map-wrap">
+          <div className="activity-map-axis-side">
+            {days.map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="activity-map-year">
+            {cells.map((cell) => (
+              <span
+                key={cell.date}
+                className={`activity-cell level-${cell.level}`}
+                title={`${cell.label}: ${cell.value} matches`}
+                aria-label={`${cell.label}: ${cell.value} matches`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -226,6 +250,60 @@ function buildActivityCells(values) {
       value,
       level: Math.min(Math.max(value, 0), 5),
     }
+  })
+}
+
+function RatingTrendChart({ values }) {
+  const width = 420
+  const height = 180
+  const minRating = 5.8
+  const maxRating = 10
+  const stepX = width / Math.max(1, values.length - 1)
+  const points = values.map((entry, index) => {
+    const x = index * stepX
+    const y = height - ((entry.rating - minRating) / (maxRating - minRating)) * height
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <div className="rating-trend-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} className="rating-trend-svg" aria-hidden="true">
+        {[6, 7, 8, 9, 10].map((tick) => {
+          const y = height - ((tick - minRating) / (maxRating - minRating)) * height
+          return <line key={tick} x1="0" y1={y} x2={width} y2={y} className="rating-grid-line" />
+        })}
+        <polyline points={points} className="rating-trend-line" />
+        {values.map((entry, index) => {
+          const x = index * stepX
+          const y = height - ((entry.rating - minRating) / (maxRating - minRating)) * height
+          return <circle key={entry.date} cx={x} cy={y} r="4" className="rating-trend-point" />
+        })}
+      </svg>
+      <div className="rating-trend-axis">
+        {values.map((entry) => <span key={entry.date}>{entry.label}</span>)}
+      </div>
+    </div>
+  )
+}
+
+function buildRatingHistory(player) {
+  const values = player.activity?.slice(0, 6) ?? [2, 3, 4, 3, 5, 4]
+  const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+  return labels.map((label, index) => ({
+    label,
+    date: label,
+    rating: Math.max(6, Math.min(9.9, Number((player.stats.avgRating - 0.7 + (values[index] ?? 0) * 0.18).toFixed(1)))),
+  }))
+}
+
+function getPlayerForm(matchLogs, playerId) {
+  return matchLogs.slice(0, 5).map((match) => {
+    const isHome = match.homeTeamId === getPlayerById(playerId)?.teamId
+    const scoredFor = isHome ? match.homeScore : match.awayScore
+    const scoredAgainst = isHome ? match.awayScore : match.homeScore
+    if (scoredFor > scoredAgainst) return 'W'
+    if (scoredFor < scoredAgainst) return 'L'
+    return 'D'
   })
 }
 
