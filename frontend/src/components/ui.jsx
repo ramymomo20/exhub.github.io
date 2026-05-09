@@ -261,7 +261,7 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
         <div className="pitch-goal-box pitch-goal-box-bottom" />
         <div className="pitch-spot pitch-spot-top" />
         <div className="pitch-spot pitch-spot-bottom" />
-        <div className="pitch-line pitch-line-center" />
+        <div className="pitch-line pitch-line-half" />
         <div className="pitch-circle" />
         {items.map((entry, index) => {
           const player = entry.playerId ? getPlayerById(entry.playerId) : null
@@ -413,7 +413,7 @@ function getMatchRatingClass(rating, badges = []) {
 }
 
 function PitchStatChips({ badges = [] }) {
-  const visible = badges.filter((badge) => ['goal', 'save', 'yellow-card', 'red-card', 'own-goal', 'assist'].includes(badge.type) && badge.count > 0)
+  const visible = badges.filter((badge) => ['goal', 'save', 'yellow-card', 'red-card', 'own-goal'].includes(badge.type) && badge.count > 0)
 
   if (!visible.length) {
     return null

@@ -303,7 +303,14 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .pitch { position: relative; min-height: 420px; overflow: hidden; border-radius: 28px; border: 1px solid rgba(74, 227, 160, 0.2); background: linear-gradient(180deg, rgba(35, 93, 69, 0.78), rgba(16, 53, 39, 0.9)), repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04) 40px, transparent 40px, transparent 80px); }
 .pitch-line, .pitch-circle { position: absolute; inset: 0; margin: auto; border-color: rgba(255, 255, 255, 0.22); }
-.pitch-line-center { width: 1px; height: 100%; background: rgba(255, 255, 255, 0.24); }
+.pitch-line-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 0;
+  border-top: 2px solid rgba(255, 255, 255, 0.72);
+}
 .pitch-circle { width: 160px; height: 160px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 50%; }
 .pitch-marker { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; gap: 6px; text-align: center; }
 .pitch-marker strong { font-size: 0.92rem; }
@@ -1203,12 +1210,12 @@ th { color: var(--text-faint); font-weight: 600; }
 }
 
 .pitch-avatar-marker {
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  clip-path: polygon(0 24%, 14% 7%, 30% 7%, 37% 0, 63% 0, 70% 7%, 86% 7%, 100% 24%, 88% 35%, 88% 100%, 12% 100%, 12% 35%);
   background:
     radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.2), transparent 34%),
     linear-gradient(180deg, var(--shirt-a, #4161ff), var(--shirt-b, #3650d8));
@@ -1216,7 +1223,7 @@ th { color: var(--text-faint); font-weight: 600; }
   font-weight: 800;
   font-size: 0.92rem;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
-  border: 3px solid rgba(247, 251, 255, 0.95);
+  border: 1px solid rgba(247, 251, 255, 0.7);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
@@ -1274,10 +1281,11 @@ th { color: var(--text-faint); font-weight: 600; }
   border-radius: 999px;
   border: 1px solid rgba(134, 182, 255, 0.48);
   background: rgba(9, 24, 45, 0.95);
-  color: #deeeff;
+  color: #111923;
   font-size: 0.69rem;
   line-height: 18px;
   transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .rating-good {
@@ -1322,6 +1330,10 @@ th { color: var(--text-faint); font-weight: 600; }
 .pitch-stat-chip .event-icon {
   width: 14px;
   height: 14px;
+}
+
+.event-icon-save {
+  filter: brightness(0) invert(1);
 }
 
 .pitch-stat-chip em {

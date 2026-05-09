@@ -558,12 +558,11 @@ export const matches = [
       ['Fouls', 3, 5],
     ],
     gameHighlights: [
-      { minute: '23', type: 'goal', text: 'Naru scores the extra-time winner from the half-space.' },
-      { minute: '19', type: 'goal', text: 'Lyo levels it again with a near-post finish.' },
-      { minute: '17', type: 'assist', text: 'Sora threads the cutback for the second goal.' },
-      { minute: '14', type: 'yellow-card', text: 'Vale is booked after stopping the break.' },
-      { minute: '11', type: 'goal', text: 'Lyo equalizes on the counter.' },
-      { minute: '4', type: 'goal', text: 'Naru opens the final with a curled finish.' },
+      { minute: '23', type: 'goal', playerName: 'Naru', assistName: 'Sora', text: 'Naru. Assist from Sora.' },
+      { minute: '19', type: 'goal', playerName: 'Lyo', text: 'Lyo.' },
+      { minute: '14', type: 'yellow-card', playerName: 'Vale', text: 'Vale.' },
+      { minute: '11', type: 'goal', playerName: 'Lyo', text: 'Lyo.' },
+      { minute: '4', type: 'goal', playerName: 'Naru', text: 'Naru.' },
     ],
     shotZones: [
       { zone: 'Inside box', home: 8, away: 5 },
@@ -635,9 +634,9 @@ export const matches = [
       ['Corners', 5, 1],
     ],
     gameHighlights: [
-      { minute: '17', type: 'save', text: 'Clixy denies the close-range rebound.' },
-      { minute: '12', type: 'goal', text: 'Mika scores from the right side of the box.' },
-      { minute: '11', type: 'save', text: 'Clixy makes back-to-back reaction saves.' },
+      { minute: '17', type: 'save', playerName: 'Clixy', text: 'Clixy.' },
+      { minute: '12', type: 'goal', playerName: 'Mika', text: 'Mika.' },
+      { minute: '11', type: 'save', playerName: 'Clixy', text: 'Clixy.' },
     ],
     shotZones: [
       { zone: 'Inside box', home: 10, away: 4 },
@@ -700,8 +699,8 @@ export const matches = [
       ['Fouls', 6, 4],
     ],
     gameHighlights: [
-      { minute: '26', type: 'goal', text: 'Cruz seals it with a set-piece finish.' },
-      { minute: '12', type: 'yellow-card', text: 'Cruz is booked after stopping the run.' },
+      { minute: '26', type: 'goal', playerName: 'Cruz', text: 'Cruz.' },
+      { minute: '12', type: 'yellow-card', playerName: 'Cruz', text: 'Cruz.' },
     ],
     shotZones: [
       { zone: 'Inside box', home: 6, away: 5 },
@@ -762,9 +761,9 @@ export const matches = [
       ['Corners', 3, 4],
     ],
     gameHighlights: [
-      { minute: '70', type: 'goal', text: 'Lyo completes the hat trick to put Velora in front.' },
-      { minute: '63', type: 'goal', text: 'Mika levels it with a far-post strike.' },
-      { minute: '42', type: 'goal', text: 'Lyo finishes after the second ball drops.' },
+      { minute: '70', type: 'goal', playerName: 'Lyo', text: 'Lyo.' },
+      { minute: '63', type: 'goal', playerName: 'Mika', text: 'Mika.' },
+      { minute: '42', type: 'goal', playerName: 'Lyo', text: 'Lyo.' },
     ],
     shotZones: [
       { zone: 'Inside box', home: 9, away: 7 },

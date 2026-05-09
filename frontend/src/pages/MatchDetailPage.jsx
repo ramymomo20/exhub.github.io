@@ -58,7 +58,7 @@ export function MatchDetailPage() {
       </section>
 
       <section className="dashboard-grid match-detail-layout">
-        <Widget title="Lineups" className="span-two lineups-main-widget">
+        <Widget title="Lineups" className="span-full lineups-main-widget">
           <div className="lineups-grid">
             <div className="lineup-team-card">
               <div className="lineup-team-header">
@@ -75,34 +75,6 @@ export function MatchDetailPage() {
           </div>
         </Widget>
 
-        <div className="match-detail-rail">
-          <Widget title="Player of the Match" className="match-detail-sidecard">
-            <div className="mvp-panel">
-              <PlayerInlineLink playerId={mvp?.id} />
-              <div className="mvp-summary-grid">
-                {match.mvpSummary.map((item) => (
-                  <div key={item.label}>
-                    <strong>{item.value}</strong>
-                    <span>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Widget>
-
-          <Widget title="Game Highlights" className="match-detail-sidecard">
-            <div className="highlights-list">
-              {match.gameHighlights.map((item) => (
-                <div key={`${item.minute}-${item.text}`} className="highlight-row">
-                  <strong>{item.minute}&apos;</strong>
-                  <EventIcon type={item.type} />
-                  <span>{item.text}</span>
-                </div>
-              ))}
-            </div>
-          </Widget>
-        </div>
-
         <Widget title="Shot Map and Zones" className="span-full">
           <div className="shot-zones-grid">
             {match.shotZones.map((zone) => (
@@ -118,7 +90,7 @@ export function MatchDetailPage() {
           </div>
         </Widget>
 
-        <Widget title="Match Stats Comparison" className="span-full comparison-widget-standalone">
+        <Widget title="Match Stats Comparison" className="span-two comparison-widget-standalone">
           <div className="comparison-grid">
             {match.comparisonStats.map(([label, homeValue, awayValue]) => (
               <div key={label} className="comparison-row comparison-row-standalone">
@@ -129,9 +101,41 @@ export function MatchDetailPage() {
             ))}
           </div>
         </Widget>
+
+        <Widget title="Game Highlights" className="match-detail-sidecard highlights-widget">
+          <div className="highlights-list">
+            {match.gameHighlights.filter((item) => item.type !== 'assist').map((item) => (
+              <div key={`${item.minute}-${item.type}-${item.playerName ?? item.text}`} className="highlight-row">
+                <strong>{item.minute}&apos;</strong>
+                <EventIcon type={item.type} />
+                <span>{formatHighlightText(item)}</span>
+              </div>
+            ))}
+          </div>
+        </Widget>
       </section>
     </div>
   )
+}
+
+function formatHighlightText(item) {
+  if (item.type === 'goal') {
+    return item.assistName ? `${item.playerName}. Assist from ${item.assistName}.` : `${item.playerName}.`
+  }
+
+  if (item.type === 'save') {
+    return `${item.playerName}.`
+  }
+
+  if (item.type === 'yellow-card' || item.type === 'red-card') {
+    return `${item.playerName}.`
+  }
+
+  if (item.type === 'own-goal') {
+    return `${item.playerName}.`
+  }
+
+  return item.playerName ?? item.text
 }
 
 function MatchHeroTeam({ team, isWinner = false }) {
