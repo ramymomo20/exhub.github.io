@@ -13,6 +13,7 @@
   --gold: #ffcb67;
   --green: #79f5bf;
   --purple: #9e77ff;
+  --red-soft: #ff6b82;
   --radius-lg: 28px;
   --shadow: 0 24px 60px rgba(1, 8, 20, 0.45);
   --max-width: 1480px;
@@ -694,6 +695,15 @@ th { color: var(--text-faint); font-weight: 600; }
   gap: 14px;
 }
 
+.match-card-clickable {
+  cursor: pointer;
+}
+
+.match-card-clickable:focus-visible {
+  outline: 2px solid rgba(87, 216, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .match-card-flags {
   display: flex;
   align-items: center;
@@ -730,6 +740,7 @@ th { color: var(--text-faint); font-weight: 600; }
   display: grid;
   align-items: center;
   gap: 14px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -763,11 +774,11 @@ th { color: var(--text-faint); font-weight: 600; }
 }
 
 .score-team-home {
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 .score-team-away {
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .match-card-datetime {
@@ -2011,6 +2022,671 @@ th { color: var(--text-faint); font-weight: 600; }
 .gd-neutral { color: var(--text-faint); }
 .gd-negative { color: #ff7a8f; }
 
+.widget-toggle-row {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.widget-toggle-pill,
+.shot-map-legend-item {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(152, 174, 214, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: 180ms ease;
+}
+
+.widget-toggle-pill.is-active,
+.shot-map-legend-item.is-active {
+  color: var(--text);
+  border-color: rgba(87, 216, 255, 0.28);
+  background: rgba(87, 216, 255, 0.1);
+}
+
+.lineups-visual-widget,
+.shot-map-widget,
+.shot-zones-visual-widget,
+.head-to-head-widget {
+  padding: 24px;
+}
+
+.lineups-widget-grid,
+.shot-zones-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.team-lineup-pitch,
+.shot-zone-mini {
+  padding: 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(152, 174, 214, 0.14);
+  background: linear-gradient(180deg, rgba(18, 27, 43, 0.96), rgba(11, 18, 29, 0.98));
+}
+
+.team-lineup-header,
+.shot-zone-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.team-lineup-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.team-lineup-title strong,
+.shot-zone-summary strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.team-lineup-title small,
+.shot-zone-summary span,
+.accuracy-ring-card span {
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.team-lineup-meta {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.team-lineup-meta strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.3rem;
+}
+
+.analytics-pitch {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(74, 140, 67, 0.96), rgba(58, 122, 56, 0.98)),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.045) 44px, transparent 44px, transparent 88px);
+}
+
+.analytics-pitch-vertical {
+  aspect-ratio: 0.74;
+}
+
+.analytics-pitch-horizontal,
+.analytics-pitch-mini {
+  aspect-ratio: 16 / 9;
+}
+
+.analytics-pitch-halfway,
+.analytics-pitch-circle,
+.analytics-pitch-box,
+.analytics-pitch-goal-box,
+.analytics-pitch-spot {
+  position: absolute;
+  pointer-events: none;
+}
+
+.analytics-pitch-halfway-vertical {
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 2px solid rgba(255, 255, 255, 0.62);
+}
+
+.analytics-pitch-halfway-horizontal {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 2px solid rgba(255, 255, 255, 0.62);
+}
+
+.analytics-pitch-circle {
+  left: 50%;
+  top: 50%;
+  width: 22%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+}
+
+.analytics-pitch-circle.is-mini {
+  width: 16%;
+}
+
+.analytics-pitch-box,
+.analytics-pitch-goal-box {
+  border: 2px solid rgba(255, 255, 255, 0.62);
+}
+
+.analytics-pitch-box-top,
+.analytics-pitch-box-bottom {
+  left: 24%;
+  width: 52%;
+  height: 13%;
+}
+
+.analytics-pitch-box-top {
+  top: 0;
+  border-top: 0;
+}
+
+.analytics-pitch-box-bottom {
+  bottom: 0;
+  border-bottom: 0;
+}
+
+.analytics-pitch-box-left,
+.analytics-pitch-box-right {
+  top: 24%;
+  width: 13%;
+  height: 52%;
+}
+
+.analytics-pitch-box-left {
+  left: 0;
+  border-left: 0;
+}
+
+.analytics-pitch-box-right {
+  right: 0;
+  border-right: 0;
+}
+
+.analytics-pitch-goal-box-top,
+.analytics-pitch-goal-box-bottom {
+  left: 39%;
+  width: 22%;
+  height: 7%;
+}
+
+.analytics-pitch-goal-box-top {
+  top: 0;
+  border-top: 0;
+}
+
+.analytics-pitch-goal-box-bottom {
+  bottom: 0;
+  border-bottom: 0;
+}
+
+.analytics-pitch-goal-box-left,
+.analytics-pitch-goal-box-right {
+  top: 39%;
+  width: 7%;
+  height: 22%;
+}
+
+.analytics-pitch-goal-box-left {
+  left: 0;
+  border-left: 0;
+}
+
+.analytics-pitch-goal-box-right {
+  right: 0;
+  border-right: 0;
+}
+
+.analytics-pitch-spot-top,
+.analytics-pitch-spot-bottom {
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.analytics-pitch-spot-top {
+  top: 15%;
+}
+
+.analytics-pitch-spot-bottom {
+  bottom: 15%;
+}
+
+.analytics-pitch-spot-left,
+.analytics-pitch-spot-right {
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.analytics-pitch-spot-left {
+  left: 15%;
+}
+
+.analytics-pitch-spot-right {
+  right: 15%;
+}
+
+.player-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 94px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  z-index: 3;
+}
+
+.player-marker-visual {
+  position: relative;
+  width: 74px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+}
+
+.jersey-marker {
+  position: relative;
+  width: 56px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+}
+
+.jersey-marker-body {
+  width: 54px;
+  height: 54px;
+  display: block;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.24), transparent 28%),
+    linear-gradient(180deg, var(--jersey-start), var(--jersey-end));
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
+}
+
+.jersey-position-label {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.rating-badge {
+  position: absolute;
+  top: -8px;
+  left: -10px;
+  min-width: 30px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #0f1826;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #d9ecff;
+  border: 1px solid rgba(152, 174, 214, 0.16);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.rating-elite {
+  color: var(--gold);
+  box-shadow: 0 0 14px rgba(255, 203, 103, 0.26);
+}
+
+.rating-regular {
+  color: var(--cyan);
+}
+
+.rating-low {
+  color: #ff9b72;
+}
+
+.event-stack-vertical {
+  position: absolute;
+  top: 8px;
+  display: grid;
+  gap: 2px;
+}
+
+.event-stack-left {
+  left: -12px;
+}
+
+.event-stack-right {
+  right: -12px;
+}
+
+.marker-event-badge {
+  min-width: 18px;
+  min-height: 18px;
+  padding: 1px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(9, 15, 24, 0.96);
+  border: 1px solid rgba(152, 174, 214, 0.18);
+}
+
+.marker-event-badge .event-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.marker-event-badge small {
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.player-nameplate {
+  max-width: 86px;
+  min-height: 20px;
+  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(8, 13, 22, 0.96);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(152, 174, 214, 0.14);
+}
+
+.player-marker.is-title-view .player-nameplate {
+  max-width: 94px;
+  font-size: 0.76rem;
+  background: rgba(12, 18, 29, 0.98);
+}
+
+.player-marker-tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  min-width: 150px;
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(7, 11, 20, 0.96);
+  border: 1px solid rgba(152, 174, 214, 0.16);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 9;
+}
+
+.player-marker:hover .player-marker-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.player-marker-tooltip strong {
+  font-size: 0.84rem;
+}
+
+.player-marker-tooltip span,
+.player-marker-tooltip small {
+  color: var(--text-soft);
+  font-size: 0.74rem;
+}
+
+.shot-map-pitch {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(152, 174, 214, 0.14);
+  background:
+    linear-gradient(180deg, rgba(72, 134, 65, 0.98), rgba(49, 106, 48, 0.98)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035) 28px, transparent 28px, transparent 56px);
+}
+
+.pitch-watermark {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(4rem, 10vw, 7rem);
+  font-weight: 700;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.pitch-watermark-left {
+  left: 15%;
+}
+
+.pitch-watermark-right {
+  right: 15%;
+}
+
+.shot-map-icon {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  z-index: 3;
+}
+
+.shot-map-icon .event-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.shot-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.shot-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shot-map-legend-check {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid rgba(152, 174, 214, 0.18);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.shot-zone-mini {
+  display: grid;
+  gap: 12px;
+}
+
+.shot-zone-summary {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.shot-zone-summary strong {
+  color: var(--text);
+}
+
+.shot-zone-overlay {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  background: rgba(47, 182, 255, var(--zone-opacity));
+  border: 1px solid rgba(115, 214, 255, 0.3);
+}
+
+.shot-zone-overlay strong {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.accuracy-rings-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.accuracy-ring-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(152, 174, 214, 0.12);
+}
+
+.accuracy-ring {
+  width: 84px;
+  height: 84px;
+  transform: rotate(-90deg);
+}
+
+.accuracy-ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 8;
+}
+
+.accuracy-ring-progress {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.accuracy-ring-center {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.accuracy-ring-center strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.1rem;
+}
+
+.mirrored-stat-list {
+  display: grid;
+  gap: 14px;
+}
+
+.mirrored-stat-row {
+  display: grid;
+  gap: 8px;
+}
+
+.mirrored-stat-values {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  align-items: center;
+  gap: 12px;
+}
+
+.mirrored-stat-values strong:first-child {
+  text-align: left;
+}
+
+.mirrored-stat-values strong:last-child {
+  text-align: right;
+}
+
+.mirrored-stat-values span {
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.mirrored-stat-bars {
+  display: grid;
+  grid-template-columns: 1fr 16px 1fr;
+  align-items: center;
+  gap: 0;
+}
+
+.mirrored-bar-side {
+  height: 10px;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.mirrored-bar-home {
+  justify-content: flex-end;
+  border-radius: 999px 0 0 999px;
+}
+
+.mirrored-bar-away {
+  justify-content: flex-start;
+  border-radius: 0 999px 999px 0;
+}
+
+.mirrored-bar-side i {
+  display: block;
+  height: 100%;
+}
+
+.mirrored-bar-home i {
+  background: linear-gradient(90deg, #1aa8f1, #57d8ff);
+}
+
+.mirrored-bar-away i {
+  background: linear-gradient(90deg, #ff514f, #ff6b82);
+}
+
+.mirrored-bar-divider {
+  width: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  justify-self: center;
+}
+
 @media (max-width: 1180px) {
   .match-hero-grid,
   .profile-hero-reworked,
@@ -2027,6 +2703,12 @@ th { color: var(--text-faint); font-weight: 600; }
 
   .profile-focus-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lineups-widget-grid,
+  .shot-zones-visual-grid,
+  .accuracy-rings-row {
+    grid-template-columns: 1fr;
   }
 
   .match-card-head,
@@ -2141,6 +2823,48 @@ th { color: var(--text-faint); font-weight: 600; }
 
   .pitch-player-name {
     font-size: 0.74rem;
+  }
+
+  .player-marker {
+    width: 78px;
+  }
+
+  .player-marker-visual {
+    width: 64px;
+    height: 52px;
+  }
+
+  .jersey-marker,
+  .jersey-marker-body {
+    width: 42px;
+    height: 42px;
+  }
+
+  .jersey-position-label {
+    top: 15px;
+    font-size: 0.68rem;
+  }
+
+  .event-stack-left {
+    left: -8px;
+  }
+
+  .event-stack-right {
+    right: -8px;
+  }
+
+  .marker-event-badge.marker-event-assist,
+  .marker-event-badge.marker-event-save {
+    display: none;
+  }
+
+  .player-nameplate {
+    max-width: 74px;
+    font-size: 0.66rem;
+  }
+
+  .mirrored-stat-values {
+    grid-template-columns: 52px 1fr 52px;
   }
 
   .activity-map-legend {

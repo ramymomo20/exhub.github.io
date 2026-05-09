@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getPlayerById, getTeamById, getTeamName } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
@@ -170,14 +170,30 @@ export function TeamCard({ team }) {
 }
 
 export function MatchCard({ match }) {
+  const navigate = useNavigate()
   const homeTeam = getTeamById(match.homeTeamId)
   const awayTeam = getTeamById(match.awayTeamId)
   const mvp = getPlayerById(match.mvpId)
   const homeWon = match.homeScore > match.awayScore
   const awayWon = match.awayScore > match.homeScore
 
+  function openMatch() {
+    navigate(`/matches/${match.id}`)
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openMatch()
+    }
+  }
+
+  function stopCardOpen(event) {
+    event.stopPropagation()
+  }
+
   return (
-    <article className="match-card card">
+    <article className="match-card card match-card-clickable" role="link" tabIndex={0} onClick={openMatch} onKeyDown={handleKeyDown}>
       <div className="match-card-head">
         <span className="match-tag">{match.competition}</span>
         <div className="match-card-datetime">
@@ -188,24 +204,23 @@ export function MatchCard({ match }) {
           {match.flags.map((flag) => (
             <span key={flag} className="flag-pill">{flag}</span>
           ))}
-          <span className={`status-pill ${match.status.toLowerCase().includes('live') ? 'is-live' : ''}`}>{match.status}</span>
         </div>
       </div>
 
       <div className="scoreboard scoreboard-expanded">
         <div className={`score-team score-team-home ${homeWon ? 'is-winner' : ''}`}>
-          <Link className="team-score-link team-score-link-home" to={`/teams/${match.homeTeamId}`}>
+          <Link className="team-score-link team-score-link-home" to={`/teams/${match.homeTeamId}`} onClick={stopCardOpen}>
             <Crest teamId={match.homeTeamId} large />
             <strong className="team-score-name">{homeTeam?.name}</strong>
           </Link>
         </div>
 
-        <Link className="score-center score-center-link" to={`/matches/${match.id}`}>
+        <div className="score-center score-center-link">
           <span className="scoreline">{match.homeScore} : {match.awayScore}</span>
-        </Link>
+        </div>
 
         <div className={`score-team score-team-away ${awayWon ? 'is-winner' : ''}`}>
-          <Link className="team-score-link team-score-link-right team-score-link-away" to={`/teams/${match.awayTeamId}`}>
+          <Link className="team-score-link team-score-link-right team-score-link-away" to={`/teams/${match.awayTeamId}`} onClick={stopCardOpen}>
             <Crest teamId={match.awayTeamId} large />
             <strong className="team-score-name">{awayTeam?.name}</strong>
           </Link>
@@ -214,8 +229,9 @@ export function MatchCard({ match }) {
 
       <div className="match-card-foot">
         <span>{match.format}</span>
-        <PlayerInlineLink playerId={mvp?.id} compact />
-        <Link className="match-open-link" to={`/matches/${match.id}`}>Open match</Link>
+        <span onClick={stopCardOpen}>
+          <PlayerInlineLink playerId={mvp?.id} compact />
+        </span>
       </div>
     </article>
   )

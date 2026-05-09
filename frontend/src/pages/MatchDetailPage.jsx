@@ -1,5 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { Crest, EventIcon, PageTrail, Pitch, PlayerInlineLink, TeamInlineLink, Widget } from '../components/ui'
+import { Crest, EventIcon, PageTrail, PlayerInlineLink, Widget } from '../components/ui'
+import { HeadToHeadWidget, LineupsWidget, ShotMapWidget, ShotZonesWidget } from '../components/matchVisualWidgets'
 import { getMatchById, getPlayerById, getTeamById } from '../data/repository'
 
 export function MatchDetailPage() {
@@ -58,49 +59,10 @@ export function MatchDetailPage() {
       </section>
 
       <section className="dashboard-grid match-detail-layout">
-        <Widget title="Lineups" className="span-full lineups-main-widget">
-          <div className="lineups-grid">
-            <div className="lineup-team-card">
-              <div className="lineup-team-header">
-                <TeamInlineLink teamId={homeTeam.id} />
-              </div>
-              <Pitch mode="match" format={match.format} lineups={match.lineups.home} tooltips={match.lineupTooltips} shirtColors={homeTeam?.colors} />
-            </div>
-            <div className="lineup-team-card">
-              <div className="lineup-team-header">
-                <TeamInlineLink teamId={awayTeam.id} />
-              </div>
-              <Pitch mode="match" format={match.format} lineups={match.lineups.away} tooltips={match.lineupTooltips} shirtColors={awayTeam?.colors} />
-            </div>
-          </div>
-        </Widget>
-
-        <Widget title="Shot Map and Zones" className="span-full">
-          <div className="shot-zones-grid">
-            {match.shotZones.map((zone) => (
-              <div key={zone.zone} className="shot-zone-card">
-                <span>{zone.zone}</span>
-                <div className="shot-zone-score">
-                  <strong>{zone.home}</strong>
-                  <small>vs</small>
-                  <strong>{zone.away}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Widget>
-
-        <Widget title="Match Stats Comparison" className="span-two comparison-widget-standalone">
-          <div className="comparison-grid">
-            {match.comparisonStats.map(([label, homeValue, awayValue]) => (
-              <div key={label} className="comparison-row comparison-row-standalone">
-                <strong>{homeValue}</strong>
-                <span>{label}</span>
-                <strong>{awayValue}</strong>
-              </div>
-            ))}
-          </div>
-        </Widget>
+        <LineupsWidget match={match} homeTeam={homeTeam} awayTeam={awayTeam} />
+        <ShotMapWidget match={match} homeTeam={homeTeam} awayTeam={awayTeam} />
+        <ShotZonesWidget match={match} homeTeam={homeTeam} awayTeam={awayTeam} />
+        <HeadToHeadWidget match={match} homeTeam={homeTeam} awayTeam={awayTeam} />
 
         <Widget title="Game Highlights" className="match-detail-sidecard highlights-widget">
           <div className="highlights-list">
@@ -116,26 +78,6 @@ export function MatchDetailPage() {
       </section>
     </div>
   )
-}
-
-function formatHighlightText(item) {
-  if (item.type === 'goal') {
-    return item.assistName ? `${item.playerName}. Assist from ${item.assistName}.` : `${item.playerName}.`
-  }
-
-  if (item.type === 'save') {
-    return `${item.playerName}.`
-  }
-
-  if (item.type === 'yellow-card' || item.type === 'red-card') {
-    return `${item.playerName}.`
-  }
-
-  if (item.type === 'own-goal') {
-    return `${item.playerName}.`
-  }
-
-  return item.playerName ?? item.text
 }
 
 function MatchHeroTeam({ team, isWinner = false }) {
@@ -216,4 +158,12 @@ function groupKeyEvents(events = []) {
     type,
     minutes: minutes.join(', '),
   }))
+}
+
+function formatHighlightText(item) {
+  if (item.type === 'goal') {
+    return item.assistName ? `${item.playerName}. Assist from ${item.assistName}.` : `${item.playerName}.`
+  }
+
+  return item.playerName ?? item.text
 }

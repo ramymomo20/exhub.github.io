@@ -564,6 +564,43 @@ export const matches = [
       { minute: '11', type: 'goal', playerName: 'Lyo', text: 'Lyo.' },
       { minute: '4', type: 'goal', playerName: 'Naru', text: 'Naru.' },
     ],
+    shotMap: [
+      { id: 'aether-shot-1', teamId: 'aether-fc', playerName: 'Naru', minute: 4, x: 80, y: 34, type: 'goal' },
+      { id: 'aether-shot-2', teamId: 'velora-athletic', playerName: 'Lyo', minute: 11, x: 22, y: 40, type: 'goal' },
+      { id: 'aether-shot-3', teamId: 'velora-athletic', playerName: 'Vale', minute: 14, x: 48, y: 56, type: 'yellow-card' },
+      { id: 'aether-shot-4', teamId: 'velora-athletic', playerName: 'Rook', minute: 18, x: 72, y: 62, type: 'save' },
+      { id: 'aether-shot-5', teamId: 'velora-athletic', playerName: 'Lyo', minute: 19, x: 24, y: 36, type: 'goal' },
+      { id: 'aether-shot-6', teamId: 'aether-fc', playerName: 'Vale', minute: 8, x: 33, y: 48, type: 'own-goal' },
+      { id: 'aether-shot-7', teamId: 'aether-fc', playerName: 'Ivo', minute: 21, x: 38, y: 58, type: 'save' },
+      { id: 'aether-shot-8', teamId: 'aether-fc', playerName: 'Naru', minute: 23, x: 77, y: 29, type: 'goal' },
+      { id: 'aether-shot-9', teamId: 'aether-fc', playerName: 'Cross', minute: 16, x: 68, y: 44, type: 'miss' },
+    ],
+    shotZoneMaps: {
+      home: {
+        teamId: 'aether-fc',
+        shots: 13,
+        goals: 3,
+        conversion: 23,
+        zones: [
+          { id: 'home-left', x: 12, y: 42, width: 18, height: 22, percentage: 20 },
+          { id: 'home-center-high', x: 36, y: 28, width: 22, height: 18, percentage: 10 },
+          { id: 'home-center-low', x: 36, y: 48, width: 22, height: 18, percentage: 30 },
+          { id: 'home-right', x: 64, y: 42, width: 18, height: 22, percentage: 18 },
+        ],
+      },
+      away: {
+        teamId: 'velora-athletic',
+        shots: 9,
+        goals: 2,
+        conversion: 22,
+        zones: [
+          { id: 'away-left', x: 12, y: 42, width: 18, height: 22, percentage: 14 },
+          { id: 'away-center-high', x: 36, y: 28, width: 22, height: 18, percentage: 29 },
+          { id: 'away-center-low', x: 36, y: 48, width: 22, height: 18, percentage: 14 },
+          { id: 'away-right', x: 64, y: 42, width: 18, height: 22, percentage: 14 },
+        ],
+      },
+    },
     shotZones: [
       { zone: 'Inside box', home: 8, away: 5 },
       { zone: 'Outside box', home: 5, away: 4 },
@@ -638,6 +675,36 @@ export const matches = [
       { minute: '12', type: 'goal', playerName: 'Mika', text: 'Mika.' },
       { minute: '11', type: 'save', playerName: 'Clixy', text: 'Clixy.' },
     ],
+    shotMap: [
+      { id: 'solstice-shot-1', teamId: 'solstice-united', playerName: 'Mika', minute: 12, x: 79, y: 35, type: 'goal' },
+      { id: 'solstice-shot-2', teamId: 'northport-city', playerName: 'Clixy', minute: 11, x: 26, y: 53, type: 'save' },
+      { id: 'solstice-shot-3', teamId: 'northport-city', playerName: 'Clixy', minute: 17, x: 29, y: 47, type: 'save' },
+      { id: 'solstice-shot-4', teamId: 'solstice-united', playerName: 'Kiro', minute: 15, x: 74, y: 49, type: 'miss' },
+    ],
+    shotZoneMaps: {
+      home: {
+        teamId: 'solstice-united',
+        shots: 15,
+        goals: 1,
+        conversion: 7,
+        zones: [
+          { id: 'sol-left', x: 10, y: 42, width: 18, height: 22, percentage: 12 },
+          { id: 'sol-center', x: 36, y: 34, width: 24, height: 26, percentage: 34 },
+          { id: 'sol-right', x: 66, y: 42, width: 18, height: 22, percentage: 18 },
+        ],
+      },
+      away: {
+        teamId: 'northport-city',
+        shots: 6,
+        goals: 1,
+        conversion: 17,
+        zones: [
+          { id: 'npc-left', x: 12, y: 42, width: 18, height: 22, percentage: 14 },
+          { id: 'npc-center', x: 38, y: 38, width: 20, height: 24, percentage: 29 },
+          { id: 'npc-right', x: 66, y: 42, width: 18, height: 22, percentage: 14 },
+        ],
+      },
+    },
     shotZones: [
       { zone: 'Inside box', home: 10, away: 4 },
       { zone: 'Outside box', home: 5, away: 2 },
@@ -702,6 +769,35 @@ export const matches = [
       { minute: '26', type: 'goal', playerName: 'Cruz', text: 'Cruz.' },
       { minute: '12', type: 'yellow-card', playerName: 'Cruz', text: 'Cruz.' },
     ],
+    shotMap: [
+      { id: 'iron-shot-1', teamId: 'ironvale-rovers', playerName: 'Cruz', minute: 26, x: 78, y: 33, type: 'goal' },
+      { id: 'iron-shot-2', teamId: 'ironvale-rovers', playerName: 'Cruz', minute: 12, x: 48, y: 56, type: 'yellow-card' },
+      { id: 'iron-shot-3', teamId: 'atlas-borough', playerName: 'Jae', minute: 21, x: 28, y: 46, type: 'miss' },
+    ],
+    shotZoneMaps: {
+      home: {
+        teamId: 'ironvale-rovers',
+        shots: 9,
+        goals: 2,
+        conversion: 22,
+        zones: [
+          { id: 'ivr-left', x: 14, y: 46, width: 18, height: 22, percentage: 20 },
+          { id: 'ivr-center', x: 38, y: 34, width: 22, height: 24, percentage: 30 },
+          { id: 'ivr-right', x: 64, y: 46, width: 18, height: 22, percentage: 18 },
+        ],
+      },
+      away: {
+        teamId: 'atlas-borough',
+        shots: 7,
+        goals: 0,
+        conversion: 0,
+        zones: [
+          { id: 'atlas-left', x: 12, y: 46, width: 18, height: 22, percentage: 14 },
+          { id: 'atlas-center', x: 38, y: 38, width: 22, height: 24, percentage: 14 },
+          { id: 'atlas-right', x: 64, y: 46, width: 18, height: 22, percentage: 14 },
+        ],
+      },
+    },
     shotZones: [
       { zone: 'Inside box', home: 6, away: 5 },
       { zone: 'Outside box', home: 3, away: 2 },
@@ -765,6 +861,37 @@ export const matches = [
       { minute: '63', type: 'goal', playerName: 'Mika', text: 'Mika.' },
       { minute: '42', type: 'goal', playerName: 'Lyo', text: 'Lyo.' },
     ],
+    shotMap: [
+      { id: 'vel-shot-1', teamId: 'velora-athletic', playerName: 'Lyo', minute: 19, x: 78, y: 42, type: 'goal' },
+      { id: 'vel-shot-2', teamId: 'velora-athletic', playerName: 'Lyo', minute: 42, x: 74, y: 31, type: 'goal' },
+      { id: 'vel-shot-3', teamId: 'solstice-united', playerName: 'Mika', minute: 63, x: 23, y: 36, type: 'goal' },
+      { id: 'vel-shot-4', teamId: 'velora-athletic', playerName: 'Lyo', minute: 70, x: 80, y: 27, type: 'goal' },
+      { id: 'vel-shot-5', teamId: 'solstice-united', playerName: 'Cross', minute: 58, x: 26, y: 46, type: 'save' },
+    ],
+    shotZoneMaps: {
+      home: {
+        teamId: 'velora-athletic',
+        shots: 14,
+        goals: 4,
+        conversion: 29,
+        zones: [
+          { id: 'vel-left', x: 12, y: 46, width: 18, height: 22, percentage: 14 },
+          { id: 'vel-center', x: 38, y: 32, width: 22, height: 26, percentage: 36 },
+          { id: 'vel-right', x: 66, y: 46, width: 18, height: 22, percentage: 21 },
+        ],
+      },
+      away: {
+        teamId: 'solstice-united',
+        shots: 11,
+        goals: 3,
+        conversion: 27,
+        zones: [
+          { id: 'su-left', x: 12, y: 42, width: 18, height: 22, percentage: 18 },
+          { id: 'su-center', x: 38, y: 36, width: 22, height: 24, percentage: 28 },
+          { id: 'su-right', x: 66, y: 42, width: 18, height: 22, percentage: 24 },
+        ],
+      },
+    },
     shotZones: [
       { zone: 'Inside box', home: 9, away: 7 },
       { zone: 'Outside box', home: 5, away: 4 },
