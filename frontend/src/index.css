@@ -727,13 +727,13 @@ th { color: var(--text-faint); font-weight: 600; }
 }
 
 .team-score-link-home {
-  grid-template-columns: auto minmax(0, 1fr);
-  justify-items: start;
+  grid-template-columns: 1fr;
+  justify-items: center;
 }
 
 .team-score-link-away {
-  grid-template-columns: minmax(0, 1fr) auto;
-  justify-items: end;
+  grid-template-columns: 1fr;
+  justify-items: center;
 }
 
 .team-score-link-right {
@@ -837,6 +837,10 @@ th { color: var(--text-faint); font-weight: 600; }
 .match-hero-topbar .match-card-flags {
   justify-self: end;
   align-self: start;
+}
+
+.match-hero-topbar-spacer {
+  min-height: 1px;
 }
 
 .match-hero-grid {
@@ -1013,6 +1017,15 @@ th { color: var(--text-faint); font-weight: 600; }
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   white-space: nowrap;
+}
+
+.match-hero-flags-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
 }
 
 .mvp-panel {

@@ -22,12 +22,7 @@ export function MatchDetailPage() {
         <div className="match-hero-topbar">
           <div className="match-hero-topbar-spacer" />
           <span className="eyebrow match-hero-competition">{match.competition}</span>
-          <div className="match-card-flags">
-            {match.flags.map((flag) => (
-              <span key={flag} className="flag-pill">{flag}</span>
-            ))}
-            <span className={`status-pill ${match.status.toLowerCase().includes('live') ? 'is-live' : ''}`}>{match.status}</span>
-          </div>
+          <div className="match-hero-topbar-spacer" />
         </div>
 
         <div className="match-hero-grid">
@@ -46,6 +41,12 @@ export function MatchDetailPage() {
               <span>{match.date}</span>
               <span>{match.time}</span>
               <span>{match.format}</span>
+            </div>
+            <div className="match-hero-flags-bottom">
+              {match.flags.map((flag) => (
+                <span key={flag} className="flag-pill">{flag}</span>
+              ))}
+              <span className={`status-pill ${match.status.toLowerCase().includes('live') ? 'is-live' : ''}`}>{match.status}</span>
             </div>
           </div>
 
