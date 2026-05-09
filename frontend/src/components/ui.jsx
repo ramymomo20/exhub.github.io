@@ -193,10 +193,10 @@ export function MatchCard({ match }) {
       </div>
 
       <div className="scoreboard scoreboard-expanded">
-        <div className={`score-team ${homeWon ? 'is-winner' : ''}`}>
-          <Link className="team-score-link" to={`/teams/${match.homeTeamId}`}>
+        <div className={`score-team score-team-home ${homeWon ? 'is-winner' : ''}`}>
+          <Link className="team-score-link team-score-link-home" to={`/teams/${match.homeTeamId}`}>
             <Crest teamId={match.homeTeamId} large />
-            <strong>{homeTeam?.name}</strong>
+            <strong className="team-score-name">{homeTeam?.name}</strong>
           </Link>
         </div>
 
@@ -204,10 +204,10 @@ export function MatchCard({ match }) {
           <span className="scoreline">{match.homeScore} : {match.awayScore}</span>
         </Link>
 
-        <div className={`score-team ${awayWon ? 'is-winner' : ''}`}>
-          <Link className="team-score-link team-score-link-right" to={`/teams/${match.awayTeamId}`}>
+        <div className={`score-team score-team-away ${awayWon ? 'is-winner' : ''}`}>
+          <Link className="team-score-link team-score-link-right team-score-link-away" to={`/teams/${match.awayTeamId}`}>
             <Crest teamId={match.awayTeamId} large />
-            <strong>{awayTeam?.name}</strong>
+            <strong className="team-score-name">{awayTeam?.name}</strong>
           </Link>
         </div>
       </div>
@@ -255,30 +255,51 @@ export function Pitch({ playersOnPitch, mode = 'summary', lineups = null, toolti
   return (
     <div className={`pitch-shell ${mode === 'match' ? 'pitch-shell-match' : ''}`}>
       <div className="pitch">
+        <div className="pitch-box pitch-box-top" />
+        <div className="pitch-box pitch-box-bottom" />
+        <div className="pitch-goal-box pitch-goal-box-top" />
+        <div className="pitch-goal-box pitch-goal-box-bottom" />
+        <div className="pitch-spot pitch-spot-top" />
+        <div className="pitch-spot pitch-spot-bottom" />
         <div className="pitch-line pitch-line-center" />
         <div className="pitch-circle" />
         {items.map((entry, index) => {
           const player = entry.playerId ? getPlayerById(entry.playerId) : null
           const tooltipLines = entry.playerId ? (tooltips[entry.playerId] ?? []) : []
           const ratingClass = getMatchRatingClass(entry.rating, entry.badges)
+          const hoverClass = getPitchHoverClass(entry)
+          const isMvp = entry.badges?.some((badge) => badge.type === 'mvp')
 
           return (
             <div
               key={`${entry.playerId ?? entry.player ?? index}-${entry.role}`}
-              className={`pitch-marker ${entry.badges?.some((badge) => badge.type === 'mvp') ? 'is-mvp' : ''}`}
+              className={`pitch-player pitch-marker${isMvp ? ' is-mvp' : ''}${hoverClass ? ` ${hoverClass}` : ''}`}
               style={{ left: `${entry.x}%`, top: `${entry.y}%` }}
             >
               {entry.rating ? <span className={`pitch-rating ${ratingClass}`}>{entry.rating}</span> : null}
               <div className={`pitch-shirt ${darkText ? 'pitch-shirt-dark' : ''}`} style={shirtStyle}>
                 <strong>{entry.role}</strong>
               </div>
-              <span className="pitch-player-name">{player?.name ?? entry.player ?? entry.playerId}</span>
+              {player ? (
+                <Link className="pitch-player-name pitch-player-name-link" to={`/players/${player.id}`}>
+                  {isMvp ? <span className="mvp-badge" title="MVP">M</span> : null}
+                  <span>{player.name}</span>
+                </Link>
+              ) : (
+                <span className="pitch-player-name">{entry.player ?? entry.playerId}</span>
+              )}
               <PitchStatChips badges={entry.badges} />
               {tooltipLines.length ? (
-                <div className="pitch-tooltip">
-                  {tooltipLines.map((line) => (
-                    <span key={line}>{line}</span>
-                  ))}
+                <div className="pitch-hover-card pitch-tooltip">
+                  <div className="pitch-hover-head">
+                    <strong>{player?.name ?? entry.player ?? entry.playerId}</strong>
+                    <span>{entry.role}</span>
+                  </div>
+                  <div className="pitch-hover-grid">
+                    {tooltipLines.map((line) => (
+                      <span key={line}>{line}</span>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -406,6 +427,16 @@ function PitchStatChips({ badges = [] }) {
       ))}
     </div>
   )
+}
+
+function getPitchHoverClass(entry) {
+  const classes = []
+
+  if (entry.x <= 24) classes.push('hover-left')
+  if (entry.x >= 76) classes.push('hover-right')
+  if (entry.y >= 68) classes.push('hover-up')
+
+  return classes.join(' ')
 }
 
 function isLightColor(hex) {

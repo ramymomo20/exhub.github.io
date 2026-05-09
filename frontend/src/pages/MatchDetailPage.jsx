@@ -1,5 +1,5 @@
-import { Navigate, useParams } from 'react-router-dom'
-import { EventIcon, PageTrail, Pitch, PlayerInlineLink, TeamInlineLink, Widget } from '../components/ui'
+import { Link, Navigate, useParams } from 'react-router-dom'
+import { Crest, EventIcon, PageTrail, Pitch, PlayerInlineLink, TeamInlineLink, Widget } from '../components/ui'
 import { getMatchById, getPlayerById, getTeamById } from '../data/repository'
 
 export function MatchDetailPage() {
@@ -20,7 +20,7 @@ export function MatchDetailPage() {
 
       <section className="match-hero card match-hero-expanded">
         <div className="match-hero-topbar">
-          <div />
+          <div className="match-hero-topbar-spacer" />
           <span className="eyebrow match-hero-competition">{match.competition}</span>
           <div className="match-card-flags">
             {match.flags.map((flag) => (
@@ -31,13 +31,9 @@ export function MatchDetailPage() {
         </div>
 
         <div className="match-hero-grid">
-          <div className="hero-side hero-side-left">
-            <div className="hero-side-inner hero-side-inner-left">
-              <div className="hero-team-block">
-                <TeamInlineLink teamId={homeTeam.id} />
-              </div>
-              <EventStack title="" entries={match.homeEventStack} />
-            </div>
+          <div className="match-hero-team-column">
+            <MatchHeroTeam team={homeTeam} isWinner={match.homeScore > match.awayScore} />
+            <EventStack entries={match.homeEventStack} align="left" />
           </div>
 
           <div className="match-hero-center match-hero-center-expanded">
@@ -46,25 +42,16 @@ export function MatchDetailPage() {
               <PlayerInlineLink playerId={mvp?.id} compact />
             </div>
             <h1>{match.homeScore} : {match.awayScore}</h1>
-            <small className="format-pill-large">{match.format}</small>
-          </div>
-
-          <div className="hero-side hero-side-right">
-            <div className="hero-side-inner hero-side-inner-right">
-              <EventStack title="" entries={match.awayEventStack} />
-              <div className="hero-team-block hero-team-block-right">
-                <TeamInlineLink teamId={awayTeam.id} />
-              </div>
+            <div className="match-hero-meta-row">
+              <span>{match.date}</span>
+              <span>{match.time}</span>
+              <span>{match.format}</span>
             </div>
           </div>
-        </div>
 
-        <div className="match-hero-bottom-row">
-          <div />
-          <div />
-          <div className="match-hero-datetime">
-            <span>{match.date}</span>
-            <strong>{match.time}</strong>
+          <div className="match-hero-team-column">
+            <MatchHeroTeam team={awayTeam} isWinner={match.awayScore > match.homeScore} />
+            <EventStack entries={match.awayEventStack} align="right" />
           </div>
         </div>
       </section>
@@ -146,7 +133,22 @@ export function MatchDetailPage() {
   )
 }
 
-function EventStack({ entries }) {
+function MatchHeroTeam({ team, isWinner = false }) {
+  if (!team) {
+    return null
+  }
+
+  return (
+    <Link className={`match-hero-team-link${isWinner ? ' is-winner' : ''}`} to={`/teams/${team.id}`}>
+      <div className="match-hero-crest-shell">
+        <Crest teamId={team.id} large />
+      </div>
+      <strong className="match-hero-team-name">{team.name}</strong>
+    </Link>
+  )
+}
+
+function EventStack({ entries, align = 'left' }) {
   const filteredEntries = entries
     .map((entry) => {
       const grouped = groupKeyEvents(entry.events)
@@ -155,7 +157,7 @@ function EventStack({ entries }) {
     .filter(Boolean)
 
   return (
-    <div className="event-stack">
+    <div className={`event-stack event-stack-${align}`}>
       {filteredEntries.map((entry) => (
         <div key={`${entry.playerName}-${entry.grouped[0]?.type}-${entry.grouped[0]?.minutes}`} className="event-stack-row">
           <div className="event-stack-player">
