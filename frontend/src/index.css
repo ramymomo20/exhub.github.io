@@ -1060,19 +1060,30 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .highlights-list {
   display: grid;
-  gap: 10px;
-  max-height: 560px;
+  gap: 8px;
+  max-height: 640px;
   overflow-y: auto;
 }
 
 .highlight-row {
   display: grid;
-  grid-template-columns: 48px 28px 1fr;
-  gap: 12px;
+  grid-template-columns: 36px 22px 1fr;
+  gap: 10px;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  min-height: 40px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.9rem;
+}
+
+.highlight-row strong {
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.highlight-row span {
+  color: var(--text);
 }
 
 .shot-zones-grid,
@@ -1111,36 +1122,39 @@ th { color: var(--text-faint); font-weight: 600; }
 }
 
 .lineup-team-card {
-  border-radius: 22px;
+  border-radius: 18px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(152, 174, 214, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(152, 174, 214, 0.14);
 }
 
 .lineup-team-header {
-  padding: 18px 20px;
-  background: #f5f7fb;
+  padding: 12px 14px;
+  background: rgba(10, 16, 24, 0.92);
+  border-bottom: 1px solid rgba(152, 174, 214, 0.12);
 }
 
 .lineup-team-header .team-inline-link {
-  color: #223552;
-  font-size: 1.28rem;
+  color: var(--text);
+  font-size: 1rem;
   font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .lineup-team-header .crest {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
 }
 
 .pitch-shell-match .pitch {
   min-height: 620px;
   border: 0;
-  border-radius: 0 0 22px 22px;
+  border-radius: 0 0 18px 18px;
   background:
-    linear-gradient(180deg, rgba(75, 152, 71, 0.94), rgba(53, 123, 58, 0.98)),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 48px, transparent 48px, transparent 96px);
+    linear-gradient(180deg, rgba(82, 147, 72, 0.96), rgba(55, 118, 54, 0.98)),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.045) 42px, transparent 42px, transparent 84px);
 }
 
 .pitch-box,
@@ -1199,8 +1213,8 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .pitch-player,
 .pitch-marker {
-  width: 90px;
-  gap: 4px;
+  width: 84px;
+  gap: 2px;
   z-index: 2;
 }
 
@@ -1242,39 +1256,39 @@ th { color: var(--text-faint); font-weight: 600; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  min-height: 16px;
-  padding: 1px 6px;
+  min-width: 32px;
+  min-height: 14px;
+  padding: 0 5px;
   border-radius: 999px;
-  background: rgba(18, 29, 47, 0.86);
-  color: #dce8fb;
-  font-size: 0.68rem;
+  background: rgba(18, 29, 47, 0.9);
+  color: #f3f7ff;
+  font-size: 0.62rem;
   letter-spacing: 0.08em;
   font-weight: 800;
 }
 
 .pitch-player-name {
-  min-height: 18px;
-  padding: 2px 7px;
+  min-height: 16px;
+  padding: 1px 6px;
   border-radius: 999px;
-  background: #213452;
+  background: rgba(9, 15, 23, 0.96);
   color: #f2f6ff;
-  max-width: 104px;
+  max-width: 96px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   line-height: 1.1;
   font-weight: 700;
-  border: 1px solid rgba(148, 184, 234, 0.4);
+  border: 1px solid rgba(148, 184, 234, 0.28);
   transition: box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .pitch-rating {
   position: absolute;
-  top: 34px;
-  left: 50%;
+  top: -8px;
+  left: 8px;
   min-width: 28px;
   height: 18px;
   padding: 0 6px;
@@ -1284,7 +1298,6 @@ th { color: var(--text-faint); font-weight: 600; }
   color: #111923;
   font-size: 0.69rem;
   line-height: 18px;
-  transform: translateX(-50%);
   pointer-events: none;
 }
 
@@ -1313,23 +1326,23 @@ th { color: var(--text-faint); font-weight: 600; }
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 5px;
-  min-height: 22px;
+  gap: 3px;
+  min-height: 18px;
 }
 
 .pitch-stat-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
+  gap: 3px;
+  padding: 1px 5px;
   border-radius: 999px;
-  background: rgba(11, 25, 49, 0.86);
-  border: 1px solid rgba(135, 183, 255, 0.32);
+  background: rgba(8, 14, 21, 0.96);
+  border: 1px solid rgba(135, 183, 255, 0.22);
 }
 
 .pitch-stat-chip .event-icon {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .event-icon-save {
@@ -1338,7 +1351,7 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .pitch-stat-chip em {
   font-style: normal;
-  font-size: 0.8rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: #e7f2ff;
 }
@@ -1896,6 +1909,17 @@ th { color: var(--text-faint); font-weight: 600; }
 .comparison-widget-standalone {
   justify-self: center;
   width: 100%;
+}
+
+.lineups-main-widget .widget-head h2,
+.comparison-widget-standalone .widget-head h2,
+.highlights-widget .widget-head h2 {
+  font-size: 1.2rem;
+  letter-spacing: 0.12em;
+}
+
+.highlights-widget {
+  min-height: 100%;
 }
 
 .comparison-row-standalone {
