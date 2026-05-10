@@ -77,7 +77,7 @@ export function Crest({ teamId, large = false }) {
       className={`crest${large ? ' crest-large' : ''}`}
       style={{ '--crest-start': team.colors[0], '--crest-end': team.colors[1] }}
     >
-      {team.crest}
+      {team.crestUrl ? <img src={team.crestUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : team.crest}
     </span>
   )
 }

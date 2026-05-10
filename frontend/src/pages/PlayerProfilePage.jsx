@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FormPills, PageTrail, StatChip, TeamInlineLink, Widget } from '../components/ui'
-import { getPlayerById, getPlayerPerformance, listPlayerMatchLogs } from '../data/repository'
+import { getPlayerById, getPlayerPerformance, listPlayerMatchLogs, useHubPlayerDetail } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
 export function PlayerProfilePage() {
   const { playerId } = useParams()
+  const { loading } = useHubPlayerDetail(playerId)
   const player = getPlayerById(playerId)
   const [page, setPage] = useState(0)
+  const steamIcon = `${import.meta.env.BASE_URL}icons/steam-icon.png`
+
+  if (!player && loading) {
+    return null
+  }
 
   if (!player) {
     return <Navigate to="/players" replace />
@@ -41,8 +47,15 @@ export function PlayerProfilePage() {
           <div className="profile-badges">
             <TeamInlineLink teamId={player.teamId} />
             <FormPills values={getPlayerForm(matchLogs, player.id)} />
-            <a className="steam-redirect-badge" href={`https://steamcommunity.com/id/${player.id}`} target="_blank" rel="noreferrer" aria-label="Open Steam profile">
-              <span>↗</span>
+            <a
+              className="steam-redirect-badge steam-redirect-badge-wide"
+              href={`https://steamcommunity.com/id/${player.id}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open Steam profile"
+            >
+              <img src={steamIcon} alt="" />
+              <span>Steam Profile</span>
             </a>
           </div>
           <div className="profile-focus-grid">
@@ -75,15 +88,19 @@ export function PlayerProfilePage() {
 
       <section className="dashboard-grid">
         <Widget title="Records" className="span-two">
-          <div className="record-link-list">
-            {player.records.map((record) => (
-              <Link key={record.label} className="record-link-card" to={`/matches/${record.matchId}`}>
-                <strong>{record.label}</strong>
-                <span>{record.value}</span>
-                <small>{record.summary}</small>
-              </Link>
-            ))}
-          </div>
+          {player.records.length ? (
+            <div className="record-link-list">
+              {player.records.map((record) => (
+                <Link key={record.label} className="record-link-card" to={`/matches/${record.matchId}`}>
+                  <strong>{record.label}</strong>
+                  <span>{record.value}</span>
+                  <small>{record.summary}</small>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p>No per-match record log has been synced for this player yet.</p>
+          )}
         </Widget>
 
         <Widget title="Activity Map">
@@ -170,24 +187,32 @@ export function PlayerProfilePage() {
         </Widget>
 
         <Widget title="Tournament Form">
-          <div className="tournament-summary-card">
-            <strong>{player.tournamentSummary.current.tournamentId.replaceAll('-', ' ')}</strong>
-            <p>Team place: {player.tournamentSummary.current.teamPlace}</p>
-            <small>{player.tournamentSummary.current.stats}</small>
-          </div>
+          {player.tournamentSummary?.current ? (
+            <div className="tournament-summary-card">
+              <strong>{player.tournamentSummary.current.tournamentId.replaceAll('-', ' ')}</strong>
+              <p>Team place: {player.tournamentSummary.current.teamPlace}</p>
+              <small>{player.tournamentSummary.current.stats}</small>
+            </div>
+          ) : (
+            <p>No synced tournament placement data for this player yet.</p>
+          )}
         </Widget>
 
         <Widget title="Previous Tournaments">
-          <div className="timeline">
-            {player.tournamentSummary.history.map((item) => (
-              <div key={`${item.tournamentId}-${item.teamPlace}`} className="timeline-item">
-                <strong>{item.tournamentId.replaceAll('-', ' ')}</strong>
-                <p>Team place {item.teamPlace}</p>
-                <small>{item.stats}</small>
-                {item.won ? <span className="crown-marker">Crown</span> : null}
-              </div>
-            ))}
-          </div>
+          {player.tournamentSummary?.history?.length ? (
+            <div className="timeline">
+              {player.tournamentSummary.history.map((item) => (
+                <div key={`${item.tournamentId}-${item.teamPlace}`} className="timeline-item">
+                  <strong>{item.tournamentId.replaceAll('-', ' ')}</strong>
+                  <p>Team place {item.teamPlace}</p>
+                  <small>{item.stats}</small>
+                  {item.won ? <span className="crown-marker">Crown</span> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No historical tournament archive has been synced for this player yet.</p>
+          )}
         </Widget>
       </section>
     </div>

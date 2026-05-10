@@ -1,54 +1,1491 @@
-import {
-  discordOverview,
-  homeFeatures,
-  matches,
-  media,
-  players,
-  positionOptions,
-  quickStats,
-  records,
-  teamOfWeek,
-  teams,
-  tournaments,
-} from './mockData'
+import { useEffect, useSyncExternalStore } from 'react'
 
-const teamIndex = new Map(teams.map((team) => [team.id, team]))
-const playerIndex = new Map(players.map((player) => [player.id, player]))
-const matchIndex = new Map(matches.map((match) => [match.id, match]))
-const tournamentIndex = new Map(tournaments.map((tournament) => [tournament.id, tournament]))
+const positionOptions = ['GK', 'LB', 'CB', 'RB', 'CM', 'LM', 'RM', 'LW', 'RW', 'CF']
 
-export const listTeams = () => teams
-export const getTeamById = (teamId) => teamIndex.get(teamId) ?? null
+const listeners = new Set()
+
+let bootstrapPromise = null
+const playerDetailPromises = new Map()
+const matchDetailPromises = new Map()
+const tournamentDetailPromises = new Map()
+
+let state = buildInitialState()
+
+function buildInitialState() {
+  return {
+    bootstrapStatus: 'idle',
+    bootstrapError: null,
+    detailStatus: {
+      players: {},
+      matches: {},
+      tournaments: {},
+    },
+    detailErrors: {
+      players: {},
+      matches: {},
+      tournaments: {},
+    },
+    teams: [],
+    players: [],
+    matches: [],
+    tournaments: [],
+    media: [],
+    records: [],
+    quickStats: [],
+    homeFeatures: [],
+    discordOverview: buildDiscordOverview([], [], [], []),
+    teamIndex: new Map(),
+    playerIndex: new Map(),
+    matchIndex: new Map(),
+    tournamentIndex: new Map(),
+  }
+}
+
+function emit() {
+  listeners.forEach((listener) => listener())
+}
+
+function subscribe(listener) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+function getSnapshot() {
+  return state
+}
+
+function setState(updater) {
+  state = typeof updater === 'function' ? updater(state) : updater
+  emit()
+}
+
+function useRepositorySnapshot() {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+function normalizeBaseUrl(value) {
+  return value.endsWith('/') ? value.slice(0, -1) : value
+}
+
+function getApiBaseUrl() {
+  const configured = String(import.meta.env.VITE_HUB_API_BASE_URL ?? '').trim()
+  if (configured) {
+    return normalizeBaseUrl(configured)
+  }
+
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000'
+    }
+  }
+
+  return ''
+}
+
+const API_BASE_URL = getApiBaseUrl()
+
+async function fetchJson(path) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+function indexById(items) {
+  return new Map(items.map((item) => [item.id, item]))
+}
+
+function replaceById(items, item) {
+  const next = items.slice()
+  const index = next.findIndex((entry) => entry.id === item.id)
+  if (index >= 0) {
+    next[index] = item
+  } else {
+    next.push(item)
+  }
+  return next
+}
+
+function applyDerivedState(baseState) {
+  const teams = enrichTeams(baseState.teams, baseState.matches)
+  const players = enrichPlayers(baseState.players, teams)
+  const tournaments = enrichTournaments(baseState.tournaments, teams, players)
+  const records = buildRecords(players, teams)
+  const quickStats = buildQuickStats(players, teams, baseState.matches, baseState.media)
+  const homeFeatures = buildHomeFeatures(baseState.matches, tournaments, teams)
+  const discordOverview = buildDiscordOverview(players, teams, baseState.matches, baseState.media)
+
+  return {
+    ...baseState,
+    teams,
+    players,
+    tournaments,
+    records,
+    quickStats,
+    homeFeatures,
+    discordOverview,
+    teamIndex: indexById(teams),
+    playerIndex: indexById(players),
+    matchIndex: indexById(baseState.matches),
+    tournamentIndex: indexById(tournaments),
+  }
+}
+
+async function ensureBootstrapLoaded() {
+  if (state.bootstrapStatus === 'loaded') {
+    return state
+  }
+
+  if (bootstrapPromise) {
+    return bootstrapPromise
+  }
+
+  setState((current) => ({
+    ...current,
+    bootstrapStatus: 'loading',
+    bootstrapError: null,
+  }))
+
+  bootstrapPromise = Promise.all([
+    fetchJson('/api/teams?limit=250'),
+    fetchJson('/api/players?limit=250'),
+    fetchJson('/api/matches?limit=200'),
+    fetchJson('/api/tournaments?limit=100'),
+    fetchJson('/api/media?limit=200'),
+  ])
+    .then(([rawTeams, rawPlayers, rawMatches, rawTournaments, rawMedia]) => {
+      const mappedState = applyDerivedState({
+        ...state,
+        bootstrapStatus: 'loaded',
+        bootstrapError: null,
+        teams: rawTeams.map(mapTeamSummary),
+        players: rawPlayers.map(mapPlayerSummary),
+        matches: rawMatches.map(mapMatchSummary),
+        tournaments: rawTournaments.map(mapTournamentSummary),
+        media: rawMedia.map(mapMediaItem),
+      })
+
+      setState(mappedState)
+      return mappedState
+    })
+    .catch((error) => {
+      setState((current) => ({
+        ...current,
+        bootstrapStatus: 'error',
+        bootstrapError: error instanceof Error ? error.message : 'Failed to load hub data.',
+      }))
+      throw error
+    })
+    .finally(() => {
+      bootstrapPromise = null
+    })
+
+  return bootstrapPromise
+}
+
+async function ensurePlayerDetailLoaded(playerId) {
+  if (!playerId) return null
+  if (state.playerIndex.get(playerId)?.isDetailed) {
+    return state.playerIndex.get(playerId)
+  }
+  if (playerDetailPromises.has(playerId)) {
+    return playerDetailPromises.get(playerId)
+  }
+
+  setDetailStatus('players', playerId, 'loading')
+
+  const promise = fetchJson(`/api/players/${encodeURIComponent(playerId)}`)
+    .then((rawPlayer) => {
+      const detailedPlayer = mapPlayerDetail(rawPlayer, state.playerIndex.get(playerId))
+      setState((current) => applyDerivedState({
+        ...current,
+        players: replaceById(current.players, detailedPlayer),
+        detailStatus: {
+          ...current.detailStatus,
+          players: {
+            ...current.detailStatus.players,
+            [playerId]: 'loaded',
+          },
+        },
+        detailErrors: {
+          ...current.detailErrors,
+          players: {
+            ...current.detailErrors.players,
+            [playerId]: null,
+          },
+        },
+      }))
+      return detailedPlayer
+    })
+    .catch((error) => {
+      setDetailError('players', playerId, error)
+      throw error
+    })
+    .finally(() => {
+      playerDetailPromises.delete(playerId)
+    })
+
+  playerDetailPromises.set(playerId, promise)
+  return promise
+}
+
+async function ensureMatchDetailLoaded(matchId) {
+  if (!matchId) return null
+  if (state.matchIndex.get(matchId)?.isDetailed) {
+    return state.matchIndex.get(matchId)
+  }
+  if (matchDetailPromises.has(matchId)) {
+    return matchDetailPromises.get(matchId)
+  }
+
+  setDetailStatus('matches', matchId, 'loading')
+
+  const promise = fetchJson(`/api/matches/${encodeURIComponent(matchId)}`)
+    .then((rawMatch) => {
+      const detailedMatch = mapMatchDetail(rawMatch)
+      setState((current) => applyDerivedState({
+        ...current,
+        matches: replaceById(current.matches, detailedMatch),
+        detailStatus: {
+          ...current.detailStatus,
+          matches: {
+            ...current.detailStatus.matches,
+            [matchId]: 'loaded',
+          },
+        },
+        detailErrors: {
+          ...current.detailErrors,
+          matches: {
+            ...current.detailErrors.matches,
+            [matchId]: null,
+          },
+        },
+      }))
+      return detailedMatch
+    })
+    .catch((error) => {
+      setDetailError('matches', matchId, error)
+      throw error
+    })
+    .finally(() => {
+      matchDetailPromises.delete(matchId)
+    })
+
+  matchDetailPromises.set(matchId, promise)
+  return promise
+}
+
+async function ensureTournamentDetailLoaded(tournamentId) {
+  if (!tournamentId) return null
+  if (state.tournamentIndex.get(tournamentId)?.isDetailed) {
+    return state.tournamentIndex.get(tournamentId)
+  }
+  if (tournamentDetailPromises.has(tournamentId)) {
+    return tournamentDetailPromises.get(tournamentId)
+  }
+
+  setDetailStatus('tournaments', tournamentId, 'loading')
+
+  const promise = fetchJson(`/api/tournaments/${encodeURIComponent(tournamentId)}`)
+    .then((rawTournament) => {
+      const detailedTournament = mapTournamentDetail(rawTournament, state.players)
+      setState((current) => applyDerivedState({
+        ...current,
+        tournaments: replaceById(current.tournaments, detailedTournament),
+        detailStatus: {
+          ...current.detailStatus,
+          tournaments: {
+            ...current.detailStatus.tournaments,
+            [tournamentId]: 'loaded',
+          },
+        },
+        detailErrors: {
+          ...current.detailErrors,
+          tournaments: {
+            ...current.detailErrors.tournaments,
+            [tournamentId]: null,
+          },
+        },
+      }))
+      return detailedTournament
+    })
+    .catch((error) => {
+      setDetailError('tournaments', tournamentId, error)
+      throw error
+    })
+    .finally(() => {
+      tournamentDetailPromises.delete(tournamentId)
+    })
+
+  tournamentDetailPromises.set(tournamentId, promise)
+  return promise
+}
+
+function setDetailStatus(scope, itemId, status) {
+  setState((current) => ({
+    ...current,
+    detailStatus: {
+      ...current.detailStatus,
+      [scope]: {
+        ...current.detailStatus[scope],
+        [itemId]: status,
+      },
+    },
+    detailErrors: {
+      ...current.detailErrors,
+      [scope]: {
+        ...current.detailErrors[scope],
+        [itemId]: null,
+      },
+    },
+  }))
+}
+
+function setDetailError(scope, itemId, error) {
+  const message = error instanceof Error ? error.message : 'Failed to load detail data.'
+  setState((current) => ({
+    ...current,
+    detailStatus: {
+      ...current.detailStatus,
+      [scope]: {
+        ...current.detailStatus[scope],
+        [itemId]: 'error',
+      },
+    },
+    detailErrors: {
+      ...current.detailErrors,
+      [scope]: {
+        ...current.detailErrors[scope],
+        [itemId]: message,
+      },
+    },
+  }))
+}
+
+export function useHubData() {
+  const snapshot = useRepositorySnapshot()
+
+  useEffect(() => {
+    if (snapshot.bootstrapStatus === 'idle') {
+      void ensureBootstrapLoaded()
+    }
+  }, [snapshot.bootstrapStatus])
+
+  return {
+    loading: snapshot.bootstrapStatus === 'idle' || snapshot.bootstrapStatus === 'loading',
+    ready: snapshot.bootstrapStatus === 'loaded',
+    error: snapshot.bootstrapError,
+  }
+}
+
+export function useHubPlayerDetail(playerId) {
+  const snapshot = useRepositorySnapshot()
+
+  useEffect(() => {
+    if (!playerId) return
+    if (snapshot.bootstrapStatus === 'idle') {
+      void ensureBootstrapLoaded()
+    }
+  }, [playerId, snapshot.bootstrapStatus])
+
+  useEffect(() => {
+    if (!playerId || snapshot.bootstrapStatus !== 'loaded') return
+    if (!snapshot.playerIndex.get(playerId)?.isDetailed) {
+      void ensurePlayerDetailLoaded(playerId)
+    }
+  }, [playerId, snapshot.bootstrapStatus, snapshot.playerIndex])
+
+  return {
+    loading: snapshot.bootstrapStatus !== 'loaded' || snapshot.detailStatus.players[playerId] === 'loading',
+    error: snapshot.detailErrors.players[playerId] ?? null,
+  }
+}
+
+export function useHubMatchDetail(matchId) {
+  const snapshot = useRepositorySnapshot()
+
+  useEffect(() => {
+    if (!matchId) return
+    if (snapshot.bootstrapStatus === 'idle') {
+      void ensureBootstrapLoaded()
+    }
+  }, [matchId, snapshot.bootstrapStatus])
+
+  useEffect(() => {
+    if (!matchId || snapshot.bootstrapStatus !== 'loaded') return
+    if (!snapshot.matchIndex.get(matchId)?.isDetailed) {
+      void ensureMatchDetailLoaded(matchId)
+    }
+  }, [matchId, snapshot.bootstrapStatus, snapshot.matchIndex])
+
+  return {
+    loading: snapshot.bootstrapStatus !== 'loaded' || snapshot.detailStatus.matches[matchId] === 'loading',
+    error: snapshot.detailErrors.matches[matchId] ?? null,
+  }
+}
+
+export function useHubTournamentDetail(tournamentId) {
+  const snapshot = useRepositorySnapshot()
+
+  useEffect(() => {
+    if (!tournamentId) return
+    if (snapshot.bootstrapStatus === 'idle') {
+      void ensureBootstrapLoaded()
+    }
+  }, [tournamentId, snapshot.bootstrapStatus])
+
+  useEffect(() => {
+    if (!tournamentId || snapshot.bootstrapStatus !== 'loaded') return
+    if (!snapshot.tournamentIndex.get(tournamentId)?.isDetailed) {
+      void ensureTournamentDetailLoaded(tournamentId)
+    }
+  }, [tournamentId, snapshot.bootstrapStatus, snapshot.tournamentIndex])
+
+  return {
+    loading: snapshot.bootstrapStatus !== 'loaded' || snapshot.detailStatus.tournaments[tournamentId] === 'loading',
+    error: snapshot.detailErrors.tournaments[tournamentId] ?? null,
+  }
+}
+
+export const listTeams = () => state.teams
+export const getTeamById = (teamId) => state.teamIndex.get(String(teamId)) ?? null
 export const getTeamName = (teamId) => getTeamById(teamId)?.name ?? teamId
-export const listPlayers = () => players
-export const getPlayerById = (playerId) => playerIndex.get(playerId) ?? null
-export const listPlayersByTeamId = (teamId) => players.filter((player) => player.teamId === teamId)
-export const listMatches = () => matches
-export const getMatchById = (matchId) => matchIndex.get(matchId) ?? null
-export const listMatchesByTeamId = (teamId) => matches.filter((match) => match.homeTeamId === teamId || match.awayTeamId === teamId)
-export const listPlayerMatchLogs = (playerId) => matches.filter((match) => match.performances.some((entry) => entry.playerId === playerId))
+export const listPlayers = () => state.players
+export const getPlayerById = (playerId) => state.playerIndex.get(String(playerId)) ?? null
+export const listPlayersByTeamId = (teamId) => state.players.filter((player) => player.teamId === teamId)
+export const listMatches = () => state.matches
+export const getMatchById = (matchId) => state.matchIndex.get(String(matchId)) ?? null
+export const listMatchesByTeamId = (teamId) => state.matches.filter((match) => match.homeTeamId === teamId || match.awayTeamId === teamId)
 export const listPlayersByIds = (playerIds) => playerIds.map((playerId) => getPlayerById(playerId)).filter(Boolean)
-export const listTournaments = () => tournaments
-export const getTournamentById = (tournamentId) => tournamentIndex.get(tournamentId) ?? null
-export const listRecords = () => records
-export const listMedia = () => media
-export const listHomeFeatures = () => homeFeatures
-export const listQuickStats = () => quickStats
-export const listTeamOfWeek = () => teamOfWeek
+export const listTournaments = () => state.tournaments
+export const getTournamentById = (tournamentId) => state.tournamentIndex.get(String(tournamentId)) ?? null
+export const listRecords = () => state.records
+export const listMedia = () => state.media
+export const listHomeFeatures = () => state.homeFeatures
+export const listQuickStats = () => state.quickStats
 export const listPositionOptions = () => positionOptions
-export const getDiscordOverview = () => discordOverview
+export const getDiscordOverview = () => state.discordOverview
+
+export function listPlayerMatchLogs(playerId) {
+  const player = getPlayerById(playerId)
+  if (player?.matchLogs?.length) {
+    return player.matchLogs
+  }
+
+  return state.matches.filter((match) => match.performances?.some((entry) => entry.playerId === playerId))
+}
 
 export function getTopRatedPlayers(limit = 3) {
-  return [...players].sort((left, right) => right.rating - left.rating).slice(0, limit)
+  return [...state.players].sort((left, right) => right.rating - left.rating).slice(0, limit)
 }
 
 export function getPlayerPerformance(matchId, playerId) {
   const match = getMatchById(matchId)
-  return match?.performances.find((entry) => entry.playerId === playerId) ?? null
+  const direct = match?.performances?.find((entry) => entry.playerId === playerId)
+  if (direct) {
+    return direct
+  }
+
+  const player = getPlayerById(playerId)
+  const matchLog = player?.matchLogs?.find((entry) => entry.id === String(matchId))
+  return matchLog?.performances?.find((entry) => entry.playerId === playerId) ?? null
 }
 
 export function getTournamentFixtures(tournamentId) {
   const tournament = getTournamentById(tournamentId)
-  if (!tournament) return []
-  return tournament.fixtures.map((matchId) => getMatchById(matchId)).filter(Boolean)
+  return tournament?.fixtures ?? []
+}
+
+function mapTeamSummary(raw) {
+  return {
+    id: String(raw.guild_id),
+    name: raw.name ?? 'Unknown Team',
+    shortName: raw.short_name || abbreviateLabel(raw.name, 3),
+    crest: abbreviateLabel(raw.short_name || raw.name, 2),
+    crestUrl: raw.crest_url ?? null,
+    captain: raw.captain_name || 'Unassigned',
+    captainDiscordId: raw.captain_discord_id ?? null,
+    avgRating: toNumber(raw.average_rating),
+    rank: 0,
+    colors: generateTeamColors(raw.guild_id || raw.name || 'team'),
+    form: [],
+    createdOn: formatIsoDate(raw.created_at),
+    competition: raw.is_national_team ? 'National Team' : raw.is_mix_team ? 'Mix Team' : 'Hub Team',
+    playerCount: toNumber(raw.player_count),
+    appearances: toNumber(raw.matches_played),
+    wins: toNumber(raw.wins),
+    draws: toNumber(raw.draws),
+    losses: toNumber(raw.losses),
+    goalsFor: toNumber(raw.goals_for),
+    goalsAgainst: toNumber(raw.goals_against),
+    isNationalTeam: Boolean(raw.is_national_team),
+    isMixTeam: Boolean(raw.is_mix_team),
+  }
+}
+
+function mapPlayerSummary(raw) {
+  const appearances = toNumber(raw.appearances)
+  const wins = toNumber(raw.wins)
+  const draws = toNumber(raw.draws)
+  const losses = toNumber(raw.losses)
+  const shots = toNumber(raw.shots)
+  const shotsOnTarget = toNumber(raw.shots_on_goal)
+  const passesCompleted = toNumber(raw.passes_completed)
+  const passesAttempted = toNumber(raw.passes_attempted || raw.passes_completed)
+  const tackles = toNumber(raw.tackles)
+  const slidingTacklesCompleted = toNumber(raw.sliding_tackles_completed)
+  const saves = toNumber(raw.keeper_saves)
+  const goalsConceded = toNumber(raw.goals_conceded)
+  const goals = toNumber(raw.goals)
+  const playerName = raw.display_name || raw.steam_id
+
+  return {
+    id: String(raw.steam_id),
+    name: playerName,
+    teamId: raw.current_team_guild_id ? String(raw.current_team_guild_id) : null,
+    rating: toNumber(raw.rating),
+    position: normalizePosition(raw.primary_position, raw),
+    portrait: abbreviateLabel(playerName, 2),
+    appearances,
+    mvps: toNumber(raw.mvp_awards),
+    stats: {
+      appearances,
+      subAppearances: 0,
+      wins,
+      draws,
+      losses,
+      winRate: appearances > 0 ? Math.round((wins / appearances) * 100) : 0,
+      goals,
+      assists: toNumber(raw.assists),
+      apasses: passesAttempted,
+      passesCompleted,
+      passAccuracy: toNumber(raw.pass_accuracy),
+      keyPasses: toNumber(raw.key_passes),
+      chancesCreated: toNumber(raw.chances_created),
+      secondAssists: toNumber(raw.second_assists),
+      fouls: toNumber(raw.fouls),
+      foulsSuffered: toNumber(raw.fouls_suffered),
+      yellowCards: toNumber(raw.yellow_cards),
+      redCards: toNumber(raw.red_cards),
+      offsides: toNumber(raw.offsides),
+      saves,
+      savesCaught: toNumber(raw.keeper_saves_caught),
+      savePercentage: saves + goalsConceded > 0 ? Math.round((saves / (saves + goalsConceded)) * 100) : 0,
+      goalsConceded,
+      ownGoals: toNumber(raw.own_goals),
+      interceptions: toNumber(raw.interceptions),
+      tackles,
+      tacklesCompleted: slidingTacklesCompleted,
+      tackleAccuracy: tackles > 0 ? Math.round((slidingTacklesCompleted / tackles) * 100) : 0,
+      distanceRan: Number(toNumber(raw.distance_covered).toFixed(1)),
+      shots,
+      shotsOnTarget,
+      shotAccuracy: shots > 0 ? Math.round((shotsOnTarget / shots) * 100) : 0,
+      goalsPerGame: appearances > 0 ? Number((goals / appearances).toFixed(2)) : 0,
+      avgRating: Number(toNumber(raw.avg_match_rating).toFixed(1)),
+      motm: toNumber(raw.mvp_awards),
+      possession: Number(toNumber(raw.possession).toFixed(1)),
+      totalMinutes: toNumber(raw.time_played || raw.total_minutes),
+    },
+    records: [],
+    activity: [],
+    tournamentSummary: null,
+    matchLogs: [],
+    isDetailed: false,
+  }
+}
+
+function mapPlayerDetail(rawPlayer, currentPlayer) {
+  const basePlayer = {
+    ...(currentPlayer ?? mapPlayerSummary(rawPlayer)),
+    ...mapPlayerSummary(rawPlayer),
+  }
+  const matchLogs = (rawPlayer.recent_matches ?? []).map((entry) => mapPlayerMatchLog(entry, basePlayer.id))
+  const activity = buildPlayerActivity(matchLogs)
+  const records = buildPlayerRecords(matchLogs)
+
+  return {
+    ...basePlayer,
+    matchLogs,
+    activity,
+    records,
+    tournamentSummary: null,
+    isDetailed: true,
+  }
+}
+
+function mapMatchSummary(raw) {
+  const competition = raw.tournament_name || formatGameType(raw.game_type)
+
+  return {
+    id: String(raw.match_stats_id),
+    sourceMatchId: raw.match_id,
+    homeTeamId: raw.home_guild_id ? String(raw.home_guild_id) : null,
+    awayTeamId: raw.away_guild_id ? String(raw.away_guild_id) : null,
+    homeScore: toNumber(raw.home_score),
+    awayScore: toNumber(raw.away_score),
+    status: 'Final',
+    flags: buildMatchFlags(raw),
+    competition,
+    competitionType: inferCompetitionType(competition),
+    format: formatGameType(raw.game_type),
+    date: formatLongDate(raw.match_datetime),
+    time: formatTime(raw.match_datetime),
+    duration: null,
+    mvpId: raw.mvp_steam_id ? String(raw.mvp_steam_id) : null,
+    mvpName: raw.mvp_player_name ?? null,
+    homeEventStack: [],
+    awayEventStack: [],
+    comparisonStats: [],
+    gameHighlights: [],
+    shotMap: [],
+    shotZoneMaps: null,
+    shotZones: [],
+    lineups: {
+      home: [],
+      away: [],
+    },
+    lineupTooltips: {},
+    mvpSummary: [],
+    performances: [],
+    tournamentId: raw.tournament_id != null ? String(raw.tournament_id) : null,
+    tournamentName: raw.tournament_name ?? null,
+    weekNumber: raw.week_number ?? null,
+    leagueKey: raw.league_key ?? null,
+    homeTeamName: raw.home_team_name ?? '',
+    awayTeamName: raw.away_team_name ?? '',
+    isDetailed: false,
+  }
+}
+
+function mapMatchDetail(rawMatch) {
+  const summary = mapMatchSummary(rawMatch)
+  const playerStats = (rawMatch.player_stats ?? []).map(mapPerformance)
+  const statsByPlayer = new Map(playerStats.map((entry) => [entry.playerId, entry]))
+  const namesByPlayer = new Map(playerStats.map((entry) => [entry.playerId, entry.playerName]))
+
+  const events = (rawMatch.events ?? []).map((entry) => mapEvent(entry, namesByPlayer))
+  const groupedEvents = groupEventsByPlayer(events)
+  const lineups = buildDetailedLineups(rawMatch.lineups ?? [], statsByPlayer, groupedEvents)
+
+  return {
+    ...summary,
+    homeEventStack: buildEventStack(groupedEvents.home),
+    awayEventStack: buildEventStack(groupedEvents.away),
+    comparisonStats: buildComparisonStats(playerStats),
+    gameHighlights: buildGameHighlights(events),
+    shotMap: buildShotMap(events),
+    shotZoneMaps: null,
+    lineups,
+    lineupTooltips: buildLineupTooltips(playerStats),
+    mvpSummary: buildMvpSummary(summary.mvpId, statsByPlayer),
+    performances: playerStats,
+    isDetailed: true,
+  }
+}
+
+function mapTournamentSummary(raw) {
+  return {
+    id: String(raw.tournament_id),
+    numericId: toNumber(raw.tournament_id),
+    name: raw.name ?? 'Tournament',
+    logo: abbreviateLabel(raw.name, 2),
+    status: toTitleCase(raw.status || 'Unknown'),
+    teams: toNumber(raw.num_teams),
+    prestige: formatTournamentPrestige(raw.format),
+    schedule: formatIsoDate(raw.created_at) || 'Season archive',
+    description: buildTournamentDescription(raw),
+    winnerTeamId: null,
+    standingsGroups: [],
+    leaders: {},
+    fixtures: [],
+    bracket: raw.format === 'cup' ? ['Knockout'] : ['League Table'],
+    isDetailed: false,
+  }
+}
+
+function mapTournamentDetail(rawTournament, players) {
+  const summary = mapTournamentSummary(rawTournament)
+  const fixtures = (rawTournament.fixtures ?? []).map((entry) => mapTournamentFixture(entry, summary))
+  const standingsGroups = buildTournamentStandingsGroups(rawTournament, fixtures)
+  const teamIds = new Set((rawTournament.teams ?? []).map((entry) => String(entry.guild_id)).filter(Boolean))
+
+  return {
+    ...summary,
+    winnerTeamId: pickTournamentWinner(summary.status, standingsGroups),
+    standingsGroups,
+    leaders: buildTournamentLeaders(players, teamIds),
+    fixtures,
+    bracket: summary.prestige.toLowerCase().includes('cup') ? ['Knockout'] : ['League Table'],
+    isDetailed: true,
+  }
+}
+
+function mapMediaItem(raw) {
+  const group = classifyMediaGroup(raw.media_type)
+  const duration = toNumber(raw.duration_seconds)
+
+  return {
+    id: String(raw.media_id),
+    title: raw.title ?? 'Media Item',
+    type: formatMediaType(raw.media_type),
+    group,
+    length: duration > 0 ? formatDuration(duration) : 'External asset',
+    lengthBucket: duration <= 30 ? 'short' : duration <= 90 ? 'medium' : 'long',
+    accent: mediaAccentForGroup(group),
+    uploader: 'Community',
+    assetUrl: raw.public_url ?? '#',
+  }
+}
+
+function mapPlayerMatchLog(rawMatch, playerId) {
+  const performance = mapPerformance(rawMatch)
+  const competition = rawMatch.tournament_name || formatGameType(rawMatch.game_type)
+
+  return {
+    id: String(rawMatch.match_stats_id),
+    sourceMatchId: rawMatch.match_id,
+    homeTeamId: rawMatch.home_guild_id ? String(rawMatch.home_guild_id) : null,
+    awayTeamId: rawMatch.away_guild_id ? String(rawMatch.away_guild_id) : null,
+    homeScore: toNumber(rawMatch.home_score),
+    awayScore: toNumber(rawMatch.away_score),
+    status: 'Final',
+    flags: buildMatchFlags(rawMatch),
+    competition,
+    competitionType: inferCompetitionType(competition),
+    format: formatGameType(rawMatch.game_type),
+    date: formatLongDate(rawMatch.match_datetime),
+    time: formatTime(rawMatch.match_datetime),
+    mvpId: rawMatch.is_match_mvp ? playerId : null,
+    performances: [performance],
+  }
+}
+
+function mapPerformance(raw) {
+  return {
+    playerId: raw.steam_id ? String(raw.steam_id) : null,
+    playerName: raw.player_name ?? '',
+    rating: Number(toNumber(raw.match_rating).toFixed(1)),
+    goals: toNumber(raw.goals),
+    shots: toNumber(raw.shots),
+    onTarget: toNumber(raw.shots_on_goal),
+    assists: toNumber(raw.assists),
+    secondAssists: toNumber(raw.second_assists),
+    keyPasses: toNumber(raw.key_passes),
+    chancesCreated: toNumber(raw.chances_created),
+    passes: toNumber(raw.passes_attempted),
+    completed: toNumber(raw.passes_completed),
+    completionPct: toNumber(raw.pass_accuracy),
+    interceptions: toNumber(raw.interceptions),
+    possessions: Number(toNumber(raw.possession).toFixed(1)),
+    saves: toNumber(raw.keeper_saves),
+    offsides: toNumber(raw.offsides),
+    distance: `${Number(toNumber(raw.distance_covered).toFixed(2))}km`,
+    fouls: toNumber(raw.fouls),
+    foulsSuffered: toNumber(raw.fouls_suffered),
+    ownGoals: toNumber(raw.own_goals),
+    goalsConceded: toNumber(raw.goals_conceded),
+    corners: 0,
+    throwIns: 0,
+    freeKicks: 0,
+    goalKicks: 0,
+    penalties: 0,
+    yellowCards: toNumber(raw.yellow_cards),
+    redCards: toNumber(raw.red_cards),
+    position: normalizePosition(raw.position_code),
+    teamSide: normalizeSide(raw.team_side),
+    isMatchMvp: Boolean(raw.is_match_mvp),
+  }
+}
+
+function mapEvent(raw, namesByPlayer) {
+  const type = normalizeEventType(raw.event_type || raw.raw_event)
+  const player1 = raw.player1_steam_id ? String(raw.player1_steam_id) : null
+  const player2 = raw.player2_steam_id ? String(raw.player2_steam_id) : null
+
+  return {
+    id: String(raw.source_event_id),
+    side: normalizeSide(raw.team_side),
+    teamId: raw.team_guild_id ? String(raw.team_guild_id) : null,
+    type,
+    minute: toNumber(raw.minute || 0),
+    playerId: player1,
+    playerName: namesByPlayer.get(player1) ?? player1 ?? 'Unknown',
+    assistId: player2,
+    assistName: namesByPlayer.get(player2) ?? player2 ?? null,
+    x: normalizeCoordinate(raw.norm_x, raw.x),
+    y: normalizeCoordinate(raw.norm_y, raw.y),
+  }
+}
+
+function enrichTeams(teams, matches) {
+  const sorted = [...teams].sort((left, right) => right.avgRating - left.avgRating || right.wins - left.wins || left.name.localeCompare(right.name))
+  const rankById = new Map(sorted.map((team, index) => [team.id, index + 1]))
+
+  return teams.map((team) => {
+    const teamMatches = matches
+      .filter((match) => match.homeTeamId === team.id || match.awayTeamId === team.id)
+      .sort(compareMatchDates)
+
+    return {
+      ...team,
+      rank: rankById.get(team.id) ?? 0,
+      form: buildForm(team.id, teamMatches),
+      competition: deriveTeamCompetition(team, teamMatches),
+    }
+  })
+}
+
+function enrichPlayers(players, teams) {
+  const teamIds = new Set(teams.map((team) => team.id))
+  return players.map((player) => ({
+    ...player,
+    teamId: teamIds.has(player.teamId) ? player.teamId : null,
+  }))
+}
+
+function enrichTournaments(tournaments, teams, players) {
+  return tournaments.map((tournament) => {
+    const relatedTeams = teams.filter((team) => team.competition === tournament.name)
+    const teamIds = new Set(relatedTeams.map((team) => team.id))
+
+    return {
+      ...tournament,
+      leaders: tournament.isDetailed ? tournament.leaders : buildTournamentLeaders(players, teamIds),
+    }
+  })
+}
+
+function buildDetailedLineups(rawLineups, statsByPlayer, groupedEvents) {
+  const lineups = {
+    home: [],
+    away: [],
+  }
+
+  rawLineups.forEach((entry) => {
+    const playerId = entry.steam_id ? String(entry.steam_id) : null
+    const statLine = playerId ? statsByPlayer.get(playerId) : null
+    const side = normalizeSide(entry.side)
+    const events = side === 'away' ? groupedEvents.away : groupedEvents.home
+    const eventSummary = playerId ? events.get(playerId) : null
+
+    lineups[side].push({
+      playerId,
+      player: entry.player_name ?? playerId ?? 'Player',
+      role: normalizePosition(entry.position_code),
+      rating: statLine?.rating ?? 0,
+      badges: buildBadgeSummary(statLine, eventSummary),
+      started: Boolean(entry.started),
+      slotOrder: toNumber(entry.slot_order),
+    })
+  })
+
+  lineups.home.sort((left, right) => left.slotOrder - right.slotOrder || left.role.localeCompare(right.role))
+  lineups.away.sort((left, right) => left.slotOrder - right.slotOrder || left.role.localeCompare(right.role))
+  return lineups
+}
+
+function buildEventStack(groupedSideEvents) {
+  return Array.from(groupedSideEvents.values())
+    .map((entry) => ({
+      playerName: entry.playerName,
+      events: entry.events.sort((left, right) => left.minute - right.minute),
+    }))
+    .filter((entry) => entry.events.length)
+}
+
+function groupEventsByPlayer(events) {
+  const grouped = {
+    home: new Map(),
+    away: new Map(),
+  }
+
+  events.forEach((event) => {
+    if (!event.playerId || !['goal', 'own-goal', 'yellow-card', 'second_yellow', 'red-card', 'save', 'miss'].includes(event.type)) {
+      return
+    }
+
+    const bucket = grouped[event.side]
+    const current = bucket.get(event.playerId) ?? {
+      playerId: event.playerId,
+      playerName: event.playerName,
+      events: [],
+    }
+    current.events.push({
+      minute: event.minute,
+      type: event.type,
+    })
+    bucket.set(event.playerId, current)
+  })
+
+  return grouped
+}
+
+function buildBadgeSummary(statLine, eventSummary) {
+  const badges = []
+
+  if (statLine?.goals) badges.push({ type: 'goal', count: statLine.goals })
+  if (statLine?.assists) badges.push({ type: 'assist', count: statLine.assists })
+  if (statLine?.saves) badges.push({ type: 'save', count: statLine.saves })
+  if (statLine?.yellowCards) badges.push({ type: 'yellow-card', count: statLine.yellowCards })
+  if (statLine?.redCards) badges.push({ type: 'red-card', count: statLine.redCards })
+  if (statLine?.ownGoals) badges.push({ type: 'own-goal', count: statLine.ownGoals })
+  if (statLine?.isMatchMvp) badges.push({ type: 'mvp', count: 1 })
+
+  if (eventSummary?.events.some((event) => event.type === 'second_yellow')) {
+    badges.push({ type: 'second_yellow', count: 1 })
+  }
+
+  return badges
+}
+
+function buildLineupTooltips(playerStats) {
+  return playerStats.reduce((accumulator, player) => {
+    if (!player.playerId) return accumulator
+
+    const lines = [
+      `${player.rating.toFixed(1)} match rating`,
+      `${player.goals} goals`,
+      `${player.assists} assists`,
+      `${player.completed}/${player.passes} passes`,
+      `${player.interceptions} interceptions`,
+    ].filter(Boolean)
+
+    accumulator[player.playerId] = lines
+    return accumulator
+  }, {})
+}
+
+function buildMvpSummary(playerId, statsByPlayer) {
+  if (!playerId) return []
+  const player = statsByPlayer.get(playerId)
+  if (!player) return []
+
+  return [
+    { label: 'Goals', value: player.goals },
+    { label: 'Assists', value: player.assists },
+    { label: 'Key passes', value: player.keyPasses },
+  ]
+}
+
+function buildComparisonStats(playerStats) {
+  const sides = {
+    home: aggregateSideStats(playerStats.filter((entry) => entry.teamSide === 'home')),
+    away: aggregateSideStats(playerStats.filter((entry) => entry.teamSide === 'away')),
+  }
+
+  return [
+    ['Possession', sides.home.possession, sides.away.possession],
+    ['Shots', sides.home.shots, sides.away.shots],
+    ['Shots on target', sides.home.shotsOnTarget, sides.away.shotsOnTarget],
+    ['Saves', sides.home.saves, sides.away.saves],
+    ['Passes', sides.home.passes, sides.away.passes],
+    ['Passes completed', sides.home.completed, sides.away.completed],
+    ['Pass accuracy', sides.home.passAccuracy, sides.away.passAccuracy],
+    ['Interceptions', sides.home.interceptions, sides.away.interceptions],
+    ['Fouls', sides.home.fouls, sides.away.fouls],
+    ['Offsides', sides.home.offsides, sides.away.offsides],
+  ]
+}
+
+function aggregateSideStats(rows) {
+  if (!rows.length) {
+    return {
+      possession: 0,
+      shots: 0,
+      shotsOnTarget: 0,
+      saves: 0,
+      passes: 0,
+      completed: 0,
+      passAccuracy: 0,
+      interceptions: 0,
+      fouls: 0,
+      offsides: 0,
+    }
+  }
+
+  const total = rows.reduce((accumulator, row) => ({
+    possession: accumulator.possession + row.possessions,
+    shots: accumulator.shots + row.shots,
+    shotsOnTarget: accumulator.shotsOnTarget + row.onTarget,
+    saves: accumulator.saves + row.saves,
+    passes: accumulator.passes + row.passes,
+    completed: accumulator.completed + row.completed,
+    interceptions: accumulator.interceptions + row.interceptions,
+    fouls: accumulator.fouls + row.fouls,
+    offsides: accumulator.offsides + row.offsides,
+  }), {
+    possession: 0,
+    shots: 0,
+    shotsOnTarget: 0,
+    saves: 0,
+    passes: 0,
+    completed: 0,
+    interceptions: 0,
+    fouls: 0,
+    offsides: 0,
+  })
+
+  return {
+    ...total,
+    possession: Math.round(total.possession / rows.length),
+    passAccuracy: total.passes > 0 ? Math.round((total.completed / total.passes) * 100) : 0,
+  }
+}
+
+function buildGameHighlights(events) {
+  return events
+    .filter((event) => ['goal', 'own-goal', 'yellow-card', 'second_yellow', 'red-card', 'save'].includes(event.type))
+    .sort((left, right) => right.minute - left.minute)
+    .map((event) => ({
+      minute: String(event.minute),
+      type: event.type,
+      playerName: event.playerName,
+      assistName: event.assistName,
+      text: event.playerName,
+    }))
+}
+
+function buildShotMap(events) {
+  return events
+    .filter((event) => event.x != null && event.y != null)
+    .filter((event) => ['goal', 'save', 'miss', 'yellow-card', 'second_yellow', 'red-card', 'own-goal'].includes(event.type))
+    .map((event) => ({
+      id: event.id,
+      teamId: event.teamId,
+      playerName: event.playerName,
+      minute: event.minute,
+      x: event.x,
+      y: event.y,
+      type: event.type,
+    }))
+}
+
+function buildTournamentStandingsGroups(rawTournament, fixtures) {
+  const fixturesByLeague = groupBy(fixtures, (fixture) => fixture.leagueKey || 'Table')
+  const standingsByLeague = groupBy(rawTournament.standings ?? [], (row) => row.league_key || 'Table')
+
+  return Object.entries(standingsByLeague).map(([leagueKey, rows]) => ({
+    name: leagueKey === 'Table' ? 'Main Table' : `Group ${leagueKey}`,
+    rows: rows.map((row) => ({
+      teamId: row.guild_id ? String(row.guild_id) : null,
+      played: toNumber(row.matches_played),
+      wins: toNumber(row.wins),
+      draws: toNumber(row.draws),
+      losses: toNumber(row.losses),
+      goalsFor: toNumber(row.goals_for),
+      goalsAgainst: toNumber(row.goals_against),
+      gd: toNumber(row.goal_diff),
+      points: toNumber(row.points),
+      form: buildTournamentForm(row.guild_id ? String(row.guild_id) : null, fixturesByLeague[leagueKey] ?? []),
+    })),
+  }))
+}
+
+function buildTournamentForm(teamId, fixtures) {
+  if (!teamId) return []
+
+  return fixtures
+    .filter((fixture) => fixture.status === 'Final')
+    .filter((fixture) => fixture.homeTeamId === teamId || fixture.awayTeamId === teamId)
+    .sort(compareMatchDates)
+    .slice(0, 5)
+    .map((fixture) => resultForTeam(teamId, fixture))
+}
+
+function mapTournamentFixture(rawFixture, tournament) {
+  const played = rawFixture.played_match_stats_id != null
+  const matchDate = rawFixture.played_match_datetime || rawFixture.played_at || rawFixture.created_at
+
+  return {
+    id: String(rawFixture.played_match_stats_id ?? rawFixture.fixture_id),
+    fixtureId: toNumber(rawFixture.fixture_id),
+    homeTeamId: rawFixture.home_guild_id ? String(rawFixture.home_guild_id) : null,
+    awayTeamId: rawFixture.away_guild_id ? String(rawFixture.away_guild_id) : null,
+    homeScore: played ? toNumber(rawFixture.played_home_score) : 0,
+    awayScore: played ? toNumber(rawFixture.played_away_score) : 0,
+    status: played ? 'Final' : (rawFixture.is_active ? 'Scheduled' : 'Pending'),
+    flags: [],
+    competition: tournament.name,
+    competitionType: inferCompetitionType(tournament.prestige),
+    format: played ? formatGameType(rawFixture.played_game_type) : tournament.prestige,
+    date: formatLongDate(matchDate),
+    time: formatTime(matchDate),
+    leagueKey: rawFixture.league_key || 'Table',
+    weekNumber: rawFixture.week_number ?? null,
+  }
+}
+
+function pickTournamentWinner(status, standingsGroups) {
+  if (String(status).toLowerCase() !== 'completed') return null
+  const firstGroup = standingsGroups[0]
+  return firstGroup?.rows?.[0]?.teamId ?? null
+}
+
+function buildTournamentLeaders(players, teamIds) {
+  const pool = teamIds.size
+    ? players.filter((player) => teamIds.has(player.teamId))
+    : players
+
+  return {
+    scorers: pool.slice().sort((left, right) => right.stats.goals - left.stats.goals).slice(0, 3).map((player) => player.name),
+    assisters: pool.slice().sort((left, right) => right.stats.assists - left.stats.assists).slice(0, 3).map((player) => player.name),
+    mvps: pool.slice().sort((left, right) => right.mvps - left.mvps).slice(0, 3).map((player) => player.name),
+    goalkeepers: pool.filter((player) => player.position === 'GK').sort((left, right) => right.stats.saves - left.stats.saves).slice(0, 3).map((player) => player.name),
+    defenders: pool.filter((player) => ['LB', 'CB', 'RB'].includes(player.position)).sort((left, right) => right.stats.interceptions - left.stats.interceptions).slice(0, 3).map((player) => player.name),
+  }
+}
+
+function buildRecords(players, teams) {
+  const teamNameById = new Map(teams.map((team) => [team.id, team.name]))
+  const records = []
+
+  const topGoals = players.slice().sort((left, right) => right.stats.goals - left.stats.goals)[0]
+  const topAssists = players.slice().sort((left, right) => right.stats.assists - left.stats.assists)[0]
+  const topInterceptions = players.slice().sort((left, right) => right.stats.interceptions - left.stats.interceptions)[0]
+  const topSaves = players.filter((player) => player.position === 'GK').sort((left, right) => right.stats.saves - left.stats.saves)[0]
+  const topPlayer = players.slice().sort((left, right) => right.rating - left.rating)[0]
+  const topTeam = teams.slice().sort((left, right) => right.avgRating - left.avgRating)[0]
+
+  if (topGoals) records.push({ label: 'Most Goals', holder: topGoals.name, value: topGoals.stats.goals, context: 'Across synced official hub matches' })
+  if (topAssists) records.push({ label: 'Most Assists', holder: topAssists.name, value: topAssists.stats.assists, context: 'Across synced official hub matches' })
+  if (topInterceptions) records.push({ label: 'Most Interceptions', holder: topInterceptions.name, value: topInterceptions.stats.interceptions, context: 'Across synced official hub matches' })
+  if (topSaves) records.push({ label: 'Most Saves', holder: topSaves.name, value: topSaves.stats.saves, context: 'Across synced official hub matches' })
+  if (topPlayer) records.push({ label: 'Highest Rated Player', holder: topPlayer.name, value: topPlayer.rating, context: topPlayer.teamId ? (teamNameById.get(topPlayer.teamId) ?? topPlayer.teamId) : 'Active hub player' })
+  if (topTeam) records.push({ label: 'Highest Rated Team', holder: topTeam.name, value: topTeam.avgRating.toFixed(1), context: `${topTeam.wins} wins | ${topTeam.draws} draws | ${topTeam.losses} losses` })
+
+  return records
+}
+
+function buildQuickStats(players, teams, matches, media) {
+  const latestMatchDate = matches.map((match) => parseDisplayDate(match.date)).filter(Boolean).sort((left, right) => right - left)[0]
+  const weekThreshold = latestMatchDate ? new Date(latestMatchDate.getTime() - 7 * 24 * 60 * 60 * 1000) : null
+  const weeklyMatches = weekThreshold
+    ? matches.filter((match) => {
+      const parsed = parseDisplayDate(match.date)
+      return parsed && parsed >= weekThreshold
+    }).length
+    : matches.length
+
+  return [
+    { label: 'Active Players', value: String(players.length), delta: `${teams.length} teams mirrored` },
+    { label: 'Matches This Week', value: String(weeklyMatches), delta: `${matches.length} total synced` },
+    { label: 'Media Assets', value: String(media.length), delta: 'Public hub library' },
+    { label: 'Tracked Teams', value: String(teams.length), delta: 'Hub read model' },
+  ]
+}
+
+function buildHomeFeatures(matches, tournaments, teams) {
+  const teamNameById = new Map(teams.map((team) => [team.id, team.name]))
+  const latestMatch = matches.slice().sort(compareMatchDates)[0]
+  const latestTournament = tournaments[0]
+
+  return [
+    latestMatch ? {
+      label: 'Latest Match',
+      title: `${teamNameById.get(latestMatch.homeTeamId) ?? latestMatch.homeTeamName ?? latestMatch.homeTeamId} ${latestMatch.homeScore} : ${latestMatch.awayScore} ${teamNameById.get(latestMatch.awayTeamId) ?? latestMatch.awayTeamName ?? latestMatch.awayTeamId}`,
+      description: 'Open the most recent synced result and review the lineups, events, and player statistics.',
+      action: `/matches/${latestMatch.id}`,
+      accent: 'cyan',
+    } : null,
+    latestTournament ? {
+      label: 'Latest Tournament',
+      title: latestTournament.name,
+      description: 'Review the most recent synced tournament table, fixtures, and team placements.',
+      action: `/tournaments/${latestTournament.id}`,
+      accent: 'blue',
+    } : null,
+    { label: 'Rankings', title: 'Track who is rising across players and teams', description: 'Compare top performers, team power levels, and head to head summaries in one place.', action: '/rankings', accent: 'gold' },
+    { label: 'Records', title: 'The historical archive is now based on live hub data', description: 'View current leaders for goals, assists, saves, interceptions, and rating.', action: '/records', accent: 'green' },
+    { label: 'Media', title: 'Highlights and uploaded assets live here', description: 'Browse the synced public media library from the hub database.', action: '/media', accent: 'purple' },
+    { label: 'Discord', title: 'The community still runs through Discord', description: 'Use the hub to bridge league data with scheduling, announcements, and match chatter.', action: '/discord', accent: 'red' },
+  ].filter(Boolean)
+}
+
+function buildDiscordOverview(players, teams, matches, media) {
+  return {
+    serverName: 'IOSCA Discord',
+    inviteLabel: 'Community operations, league announcements, match scheduling, and media drops.',
+    stats: [
+      { label: 'Tracked Teams', value: String(teams.length) },
+      { label: 'Tracked Players', value: String(players.length) },
+      { label: 'Synced Matches', value: String(matches.length) },
+      { label: 'Public Media', value: String(media.length) },
+    ],
+    channels: ['#announcements', '#matchday', '#transfers', '#highlights', '#support'],
+  }
+}
+
+function buildPlayerActivity(matchLogs) {
+  const monthly = Array.from({ length: 24 }, () => 0)
+
+  matchLogs.forEach((match) => {
+    const parsed = parseDisplayDate(match.date)
+    if (!parsed) return
+    const monthIndex = parsed.getMonth()
+    monthly[monthIndex % 24] += 1
+  })
+
+  return monthly.map((value) => Math.min(value, 5))
+}
+
+function buildPlayerRecords(matchLogs) {
+  if (!matchLogs.length) {
+    return []
+  }
+
+  const performances = matchLogs
+    .map((match) => ({
+      matchId: match.id,
+      summary: `${getTeamName(match.homeTeamId)} ${match.homeScore} : ${match.awayScore} ${getTeamName(match.awayTeamId)}`,
+      performance: match.performances[0],
+    }))
+    .filter((entry) => entry.performance)
+
+  const topGoals = performances.slice().sort((left, right) => right.performance.goals - left.performance.goals)[0]
+  const topAssists = performances.slice().sort((left, right) => right.performance.assists - left.performance.assists)[0]
+  const topRating = performances.slice().sort((left, right) => right.performance.rating - left.performance.rating)[0]
+  const lowRating = performances.slice().sort((left, right) => left.performance.rating - right.performance.rating)[0]
+
+  return [
+    topGoals ? { label: 'Most goals in a match', value: String(topGoals.performance.goals), matchId: topGoals.matchId, summary: topGoals.summary } : null,
+    topAssists ? { label: 'Most assists in a match', value: String(topAssists.performance.assists), matchId: topAssists.matchId, summary: topAssists.summary } : null,
+    topRating ? { label: 'Highest match rating', value: String(topRating.performance.rating), matchId: topRating.matchId, summary: topRating.summary } : null,
+    lowRating ? { label: 'Lowest match rating', value: String(lowRating.performance.rating), matchId: lowRating.matchId, summary: lowRating.summary } : null,
+  ].filter(Boolean)
+}
+
+function buildForm(teamId, matches) {
+  return matches
+    .slice()
+    .sort(compareMatchDates)
+    .slice(0, 5)
+    .map((match) => resultForTeam(teamId, match))
+}
+
+function resultForTeam(teamId, match) {
+  const isHome = match.homeTeamId === teamId
+  const goalsFor = isHome ? match.homeScore : match.awayScore
+  const goalsAgainst = isHome ? match.awayScore : match.homeScore
+  if (goalsFor > goalsAgainst) return 'W'
+  if (goalsFor < goalsAgainst) return 'L'
+  return 'D'
+}
+
+function deriveTeamCompetition(team, matches) {
+  if (team.isNationalTeam) return 'National Team'
+  if (team.isMixTeam) return 'Mix Team'
+  return matches[0]?.competition ?? 'Hub Team'
+}
+
+function compareMatchDates(left, right) {
+  const leftDate = parseDisplayDate(left.date)
+  const rightDate = parseDisplayDate(right.date)
+  return (rightDate?.getTime() ?? 0) - (leftDate?.getTime() ?? 0)
+}
+
+function parseDisplayDate(value) {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function formatLongDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function formatTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatIsoDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+function formatDuration(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatGameType(value) {
+  return String(value ?? '').trim().toUpperCase() || 'Match'
+}
+
+function formatTournamentPrestige(value) {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  if (normalized === 'cup') return 'Elite Cup'
+  if (normalized === 'league') return 'League'
+  return toTitleCase(value || 'Tournament')
+}
+
+function buildTournamentDescription(raw) {
+  const formatLabel = formatTournamentPrestige(raw.format)
+  return `${formatLabel} competition with ${toNumber(raw.num_teams)} tracked teams.`
+}
+
+function inferCompetitionType(value) {
+  const normalized = String(value ?? '').toLowerCase()
+  if (normalized.includes('cup')) return 'Cup'
+  if (normalized.includes('league')) return 'League'
+  return 'Competition'
+}
+
+function buildMatchFlags(raw) {
+  const flags = []
+  if (raw.extratime) flags.push('ET')
+  if (raw.penalties) flags.push('PEN')
+  if (raw.comeback_flag) flags.push('COMEBACK')
+  return flags
+}
+
+function classifyMediaGroup(mediaType) {
+  const normalized = String(mediaType ?? '').toLowerCase()
+  if (normalized.includes('screen')) return 'screenshots'
+  if (normalized.includes('goal')) return 'goal-clips'
+  if (normalized.includes('compilation')) return 'compilations'
+  return 'highlights'
+}
+
+function formatMediaType(mediaType) {
+  return toTitleCase(String(mediaType ?? 'media').replaceAll('_', ' '))
+}
+
+function mediaAccentForGroup(group) {
+  if (group === 'goal-clips') return 'gold'
+  if (group === 'screenshots') return 'red'
+  if (group === 'compilations') return 'blue'
+  return 'cyan'
+}
+
+function normalizePosition(position, rawPlayer = null) {
+  const normalized = String(position ?? '').trim().toUpperCase()
+  if (positionOptions.includes(normalized)) {
+    return normalized
+  }
+
+  if (rawPlayer) {
+    const roleScores = [
+      ['GK', toNumber(rawPlayer.gk_rating)],
+      ['CB', toNumber(rawPlayer.def_rating)],
+      ['CM', toNumber(rawPlayer.mid_rating)],
+      ['CF', toNumber(rawPlayer.atk_rating)],
+    ]
+    roleScores.sort((left, right) => right[1] - left[1])
+    return roleScores[0][0]
+  }
+
+  return 'CM'
+}
+
+function normalizeSide(value) {
+  return String(value ?? '').toLowerCase() === 'away' ? 'away' : 'home'
+}
+
+function normalizeEventType(value) {
+  const normalized = String(value ?? '').trim().toLowerCase().replaceAll(' ', '_')
+  if (normalized.includes('own')) return 'own-goal'
+  if (normalized.includes('second_yellow')) return 'second_yellow'
+  if (normalized.includes('yellow')) return 'yellow-card'
+  if (normalized.includes('red')) return 'red-card'
+  if (normalized.includes('save')) return 'save'
+  if (normalized.includes('goal')) return 'goal'
+  if (normalized.includes('shot') || normalized.includes('miss')) return 'miss'
+  return normalized
+}
+
+function normalizeCoordinate(normalizedValue, rawValue) {
+  if (normalizedValue != null) {
+    const numeric = Number(normalizedValue)
+    if (Number.isFinite(numeric)) {
+      return Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric))
+    }
+  }
+
+  if (rawValue != null) {
+    const numeric = Number(rawValue)
+    if (Number.isFinite(numeric)) {
+      return Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric))
+    }
+  }
+
+  return null
+}
+
+function abbreviateLabel(value, maxLength = 2) {
+  const text = String(value ?? '').trim()
+  if (!text) return '?'
+  const parts = text.split(/\s+/).slice(0, maxLength)
+  const compact = parts.map((part) => part[0] ?? '').join('')
+  return compact.toUpperCase() || text.slice(0, maxLength).toUpperCase()
+}
+
+function generateTeamColors(seed) {
+  const palette = [
+    ['#46d7ff', '#1e63ff'],
+    ['#ffd36e', '#ff9540'],
+    ['#6cf0cb', '#10907e'],
+    ['#ff768f', '#b21e52'],
+    ['#6cb6ff', '#3850ff'],
+    ['#9e77ff', '#5542ff'],
+    ['#ffab91', '#ff7043'],
+    ['#80cbc4', '#00897b'],
+  ]
+  const index = Math.abs(hashCode(String(seed))) % palette.length
+  return palette[index]
+}
+
+function hashCode(value) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(index)
+    hash |= 0
+  }
+  return hash
+}
+
+function toTitleCase(value) {
+  return String(value ?? '')
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+function toNumber(value) {
+  const numeric = Number(value ?? 0)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function groupBy(items, selector) {
+  return items.reduce((accumulator, item) => {
+    const key = selector(item)
+    accumulator[key] = accumulator[key] ?? []
+    accumulator[key].push(item)
+    return accumulator
+  }, {})
 }

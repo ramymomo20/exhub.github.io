@@ -1,10 +1,15 @@
 import { Navigate, useParams } from 'react-router-dom'
 import { FormPills, PageTrail, TeamInlineLink, Widget } from '../components/ui'
-import { getTournamentById, getTournamentFixtures } from '../data/repository'
+import { getTournamentById, getTournamentFixtures, useHubTournamentDetail } from '../data/repository'
 
 export function TournamentDetailPage() {
   const { tournamentId } = useParams()
+  const { loading } = useHubTournamentDetail(tournamentId)
   const tournament = getTournamentById(tournamentId)
+
+  if (!tournament && loading) {
+    return null
+  }
 
   if (!tournament) {
     return <Navigate to="/tournaments" replace />
@@ -77,14 +82,18 @@ export function TournamentDetailPage() {
         ))}
 
         <Widget title="Tournament Leaders">
-          <div className="timeline">
-            {Object.entries(tournament.leaders).map(([label, values]) => (
-              <div key={label} className="timeline-item">
-                <strong>{label}</strong>
-                <p>{values.join(' | ')}</p>
-              </div>
-            ))}
-          </div>
+          {Object.keys(tournament.leaders).length ? (
+            <div className="timeline">
+              {Object.entries(tournament.leaders).map(([label, values]) => (
+                <div key={label} className="timeline-item">
+                  <strong>{label}</strong>
+                  <p>{values.length ? values.join(' | ') : 'No synced leaders yet'}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No tournament leader summaries have been synced yet.</p>
+          )}
         </Widget>
 
         <Widget title="Fixtures" className="span-two">

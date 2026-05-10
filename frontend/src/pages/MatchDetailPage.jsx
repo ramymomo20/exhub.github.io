@@ -1,11 +1,16 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Crest, EventIcon, PageTrail, PlayerInlineLink, Widget } from '../components/ui'
 import { FullPlayerStatsWidget, HeadToHeadWidget, LineupsWidget, ShotMapWidget, ShotZonesWidget } from '../components/matchVisualWidgets'
-import { getMatchById, getPlayerById, getTeamById } from '../data/repository'
+import { getMatchById, getPlayerById, getTeamById, useHubMatchDetail } from '../data/repository'
 
 export function MatchDetailPage() {
   const { matchId } = useParams()
+  const { loading } = useHubMatchDetail(matchId)
   const match = getMatchById(matchId)
+
+  if (!match && loading) {
+    return null
+  }
 
   if (!match) {
     return <Navigate to="/matches" replace />

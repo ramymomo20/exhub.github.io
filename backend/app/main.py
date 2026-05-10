@@ -31,6 +31,168 @@ app.add_middleware(
 )
 
 
+PLAYER_STATS_SUBQUERY = """
+    SELECT
+        pmd.steam_id,
+        SUM(pmd.goals) AS goals,
+        SUM(pmd.assists) AS assists,
+        SUM(pmd.second_assists) AS second_assists,
+        SUM(pmd.shots) AS shots,
+        SUM(pmd.shots_on_goal) AS shots_on_goal,
+        SUM(pmd.passes_completed) AS passes_completed,
+        SUM(pmd.passes_attempted) AS passes_attempted,
+        CASE
+            WHEN SUM(pmd.passes_attempted) > 0
+                THEN ROUND((SUM(pmd.passes_completed) / SUM(pmd.passes_attempted)) * 100, 2)
+            ELSE 0
+        END AS pass_accuracy,
+        SUM(pmd.chances_created) AS chances_created,
+        SUM(pmd.key_passes) AS key_passes,
+        SUM(pmd.interceptions) AS interceptions,
+        SUM(pmd.tackles) AS tackles,
+        SUM(pmd.sliding_tackles_completed) AS sliding_tackles_completed,
+        SUM(pmd.fouls) AS fouls,
+        SUM(pmd.fouls_suffered) AS fouls_suffered,
+        SUM(pmd.yellow_cards) AS yellow_cards,
+        SUM(pmd.red_cards) AS red_cards,
+        SUM(pmd.own_goals) AS own_goals,
+        SUM(pmd.keeper_saves) AS keeper_saves,
+        SUM(pmd.keeper_saves_caught) AS keeper_saves_caught,
+        SUM(pmd.goals_conceded) AS goals_conceded,
+        SUM(pmd.offsides) AS offsides,
+        AVG(pmd.possession) AS possession,
+        SUM(pmd.time_played) AS time_played,
+        SUM(pmd.distance_covered) AS distance_covered,
+        AVG(pmd.match_rating) AS avg_match_rating,
+        SUM(CASE WHEN pmd.is_match_mvp THEN 1 ELSE 0 END) AS mvp_awards,
+        SUM(
+            CASE
+                WHEN (pmd.team_side = 'home' AND m.home_score > m.away_score)
+                  OR (pmd.team_side = 'away' AND m.away_score > m.home_score)
+                    THEN 1
+                ELSE 0
+            END
+        ) AS wins,
+        SUM(CASE WHEN m.home_score = m.away_score THEN 1 ELSE 0 END) AS draws,
+        SUM(
+            CASE
+                WHEN (pmd.team_side = 'home' AND m.home_score < m.away_score)
+                  OR (pmd.team_side = 'away' AND m.away_score < m.home_score)
+                    THEN 1
+                ELSE 0
+            END
+        ) AS losses
+    FROM hub_match_player_stats pmd
+    LEFT JOIN hub_matches m ON m.match_stats_id = pmd.match_stats_id
+    GROUP BY pmd.steam_id
+"""
+
+CURRENT_PLAYER_TEAM_SUBQUERY = """
+    SELECT latest.steam_id, latest.team_guild_id, latest.guild_team_name
+    FROM hub_match_player_stats latest
+    JOIN (
+        SELECT steam_id, MAX(match_stats_id) AS latest_match_stats_id
+        FROM hub_match_player_stats
+        WHERE team_guild_id IS NOT NULL
+        GROUP BY steam_id
+    ) summary
+        ON summary.steam_id = latest.steam_id
+       AND summary.latest_match_stats_id = latest.match_stats_id
+"""
+
+PLAYER_SELECT_FIELDS = """
+    p.steam_id,
+    p.discord_id,
+    p.display_name,
+    p.primary_position,
+    p.rating,
+    p.atk_rating,
+    p.mid_rating,
+    p.def_rating,
+    p.gk_rating,
+    p.appearances,
+    p.total_minutes,
+    p.last_match_at,
+    p.registered_at,
+    p.source_updated_at,
+    p.synced_at,
+    current_team.team_guild_id AS current_team_guild_id,
+    current_team.guild_team_name AS current_team_name,
+    COALESCE(stats.goals, 0) AS goals,
+    COALESCE(stats.assists, 0) AS assists,
+    COALESCE(stats.second_assists, 0) AS second_assists,
+    COALESCE(stats.shots, 0) AS shots,
+    COALESCE(stats.shots_on_goal, 0) AS shots_on_goal,
+    COALESCE(stats.passes_completed, 0) AS passes_completed,
+    COALESCE(stats.passes_attempted, 0) AS passes_attempted,
+    COALESCE(stats.pass_accuracy, 0) AS pass_accuracy,
+    COALESCE(stats.chances_created, 0) AS chances_created,
+    COALESCE(stats.key_passes, 0) AS key_passes,
+    COALESCE(stats.interceptions, 0) AS interceptions,
+    COALESCE(stats.tackles, 0) AS tackles,
+    COALESCE(stats.sliding_tackles_completed, 0) AS sliding_tackles_completed,
+    COALESCE(stats.fouls, 0) AS fouls,
+    COALESCE(stats.fouls_suffered, 0) AS fouls_suffered,
+    COALESCE(stats.yellow_cards, 0) AS yellow_cards,
+    COALESCE(stats.red_cards, 0) AS red_cards,
+    COALESCE(stats.own_goals, 0) AS own_goals,
+    COALESCE(stats.keeper_saves, 0) AS keeper_saves,
+    COALESCE(stats.keeper_saves_caught, 0) AS keeper_saves_caught,
+    COALESCE(stats.goals_conceded, 0) AS goals_conceded,
+    COALESCE(stats.offsides, 0) AS offsides,
+    COALESCE(stats.possession, 0) AS possession,
+    COALESCE(stats.time_played, 0) AS time_played,
+    COALESCE(stats.distance_covered, 0) AS distance_covered,
+    COALESCE(stats.avg_match_rating, 0) AS avg_match_rating,
+    COALESCE(stats.mvp_awards, 0) AS mvp_awards,
+    COALESCE(stats.wins, 0) AS wins,
+    COALESCE(stats.draws, 0) AS draws,
+    COALESCE(stats.losses, 0) AS losses
+"""
+
+PLAYER_SELECT_FROM = f"""
+    FROM hub_players p
+    LEFT JOIN ({PLAYER_STATS_SUBQUERY}) stats ON stats.steam_id = p.steam_id
+    LEFT JOIN ({CURRENT_PLAYER_TEAM_SUBQUERY}) current_team ON current_team.steam_id = p.steam_id
+"""
+
+MATCH_SELECT_FIELDS = """
+    m.match_stats_id,
+    m.match_id,
+    m.match_datetime,
+    m.home_guild_id,
+    m.away_guild_id,
+    m.home_team_name,
+    m.home_short_name,
+    m.home_crest_url,
+    m.away_team_name,
+    m.away_short_name,
+    m.away_crest_url,
+    m.home_score,
+    m.away_score,
+    m.game_type,
+    m.extratime,
+    m.penalties,
+    m.comeback_flag,
+    m.source_filename,
+    m.mvp_steam_id,
+    m.mvp_player_name,
+    m.mvp_match_rating,
+    m.source_updated_at,
+    m.synced_at,
+    fixture.tournament_id,
+    tournament.name AS tournament_name,
+    fixture.league_key,
+    fixture.week_number
+"""
+
+MATCH_SELECT_FROM = """
+    FROM v_hub_match_overview m
+    LEFT JOIN hub_tournament_fixtures fixture ON fixture.played_match_stats_id = m.match_stats_id
+    LEFT JOIN hub_tournaments tournament ON tournament.tournament_id = fixture.tournament_id
+"""
+
+
 async def fetch_all(request: Request, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
     async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
         await cur.execute(sql, params)
@@ -62,7 +224,7 @@ async def list_players(
     where = ""
     params: list[Any] = []
     if q.strip():
-        where = "WHERE display_name LIKE %s OR steam_id LIKE %s"
+        where = "WHERE p.display_name LIKE %s OR p.steam_id LIKE %s"
         like = f"%{q.strip()}%"
         params.extend([like, like])
 
@@ -70,10 +232,10 @@ async def list_players(
     return await fetch_all(
         request,
         f"""
-        SELECT *
-        FROM v_hub_player_totals
+        SELECT {PLAYER_SELECT_FIELDS}
+        {PLAYER_SELECT_FROM}
         {where}
-        ORDER BY rating DESC, display_name ASC
+        ORDER BY p.rating DESC, p.display_name ASC
         LIMIT %s OFFSET %s
         """,
         tuple(params),
@@ -82,18 +244,45 @@ async def list_players(
 
 @app.get("/api/players/{steam_id}")
 async def get_player(request: Request, steam_id: str):
-    player = await fetch_one(request, "SELECT * FROM v_hub_player_totals WHERE steam_id = %s", (steam_id,))
+    player = await fetch_one(
+        request,
+        f"""
+        SELECT {PLAYER_SELECT_FIELDS}
+        {PLAYER_SELECT_FROM}
+        WHERE p.steam_id = %s
+        """,
+        (steam_id,),
+    )
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
 
     player["recent_matches"] = await fetch_all(
         request,
-        """
-        SELECT pmd.*, m.match_datetime, m.home_team_name, m.away_team_name, m.home_score, m.away_score
+        f"""
+        SELECT
+            pmd.*,
+            overview.match_datetime,
+            overview.home_guild_id,
+            overview.away_guild_id,
+            overview.home_team_name,
+            overview.away_team_name,
+            overview.home_score,
+            overview.away_score,
+            overview.game_type,
+            overview.extratime,
+            overview.penalties,
+            overview.comeback_flag,
+            overview.tournament_id,
+            overview.tournament_name,
+            overview.league_key,
+            overview.week_number
         FROM hub_match_player_stats pmd
-        JOIN hub_matches m ON m.match_stats_id = pmd.match_stats_id
+        JOIN (
+            SELECT {MATCH_SELECT_FIELDS}
+            {MATCH_SELECT_FROM}
+        ) overview ON overview.match_stats_id = pmd.match_stats_id
         WHERE pmd.steam_id = %s
-        ORDER BY m.match_datetime DESC
+        ORDER BY overview.match_datetime DESC
         LIMIT 20
         """,
         (steam_id,),
@@ -123,14 +312,24 @@ async def get_team(request: Request, guild_id: str):
 
     team["recent_matches"] = await fetch_all(
         request,
-        """
-        SELECT *
-        FROM v_hub_match_overview
-        WHERE home_guild_id = %s OR away_guild_id = %s
-        ORDER BY match_datetime DESC
+        f"""
+        SELECT {MATCH_SELECT_FIELDS}
+        {MATCH_SELECT_FROM}
+        WHERE m.home_guild_id = %s OR m.away_guild_id = %s
+        ORDER BY m.match_datetime DESC
         LIMIT 20
         """,
         (guild_id, guild_id),
+    )
+    team["players"] = await fetch_all(
+        request,
+        f"""
+        SELECT {PLAYER_SELECT_FIELDS}
+        {PLAYER_SELECT_FROM}
+        WHERE current_team.team_guild_id = %s
+        ORDER BY p.rating DESC, p.display_name ASC
+        """,
+        (guild_id,),
     )
     return team
 
@@ -145,17 +344,17 @@ async def list_matches(
     where = ""
     params: list[Any] = []
     if team_id is not None:
-        where = "WHERE home_guild_id = %s OR away_guild_id = %s"
+        where = "WHERE m.home_guild_id = %s OR m.away_guild_id = %s"
         params.extend([team_id, team_id])
     params.extend([limit, offset])
 
     return await fetch_all(
         request,
         f"""
-        SELECT *
-        FROM v_hub_match_overview
+        SELECT {MATCH_SELECT_FIELDS}
+        {MATCH_SELECT_FROM}
         {where}
-        ORDER BY match_datetime DESC
+        ORDER BY m.match_datetime DESC
         LIMIT %s OFFSET %s
         """,
         tuple(params),
@@ -164,7 +363,15 @@ async def list_matches(
 
 @app.get("/api/matches/{match_stats_id}")
 async def get_match(request: Request, match_stats_id: int):
-    match = await fetch_one(request, "SELECT * FROM v_hub_match_overview WHERE match_stats_id = %s", (match_stats_id,))
+    match = await fetch_one(
+        request,
+        f"""
+        SELECT {MATCH_SELECT_FIELDS}
+        {MATCH_SELECT_FROM}
+        WHERE m.match_stats_id = %s
+        """,
+        (match_stats_id,),
+    )
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
 
@@ -218,7 +425,32 @@ async def get_tournament(request: Request, tournament_id: int):
     )
     tournament["fixtures"] = await fetch_all(
         request,
-        "SELECT * FROM hub_tournament_fixtures WHERE tournament_id = %s ORDER BY league_key, week_number, fixture_id",
+        """
+        SELECT
+            fixture.*,
+            played.match_datetime AS played_match_datetime,
+            played.home_score AS played_home_score,
+            played.away_score AS played_away_score,
+            played.game_type AS played_game_type,
+            played.match_id AS played_match_id,
+            played.home_team_name AS played_home_team_name,
+            played.away_team_name AS played_away_team_name
+        FROM hub_tournament_fixtures fixture
+        LEFT JOIN (
+            SELECT
+                m.match_stats_id,
+                m.match_id,
+                m.match_datetime,
+                m.home_team_name,
+                m.away_team_name,
+                m.home_score,
+                m.away_score,
+                m.game_type
+            FROM v_hub_match_overview m
+        ) played ON played.match_stats_id = fixture.played_match_stats_id
+        WHERE fixture.tournament_id = %s
+        ORDER BY fixture.league_key, fixture.week_number, fixture.fixture_id
+        """,
         (tournament_id,),
     )
     return tournament

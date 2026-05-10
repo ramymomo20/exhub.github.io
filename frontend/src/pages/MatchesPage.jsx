@@ -6,6 +6,8 @@ export function MatchesPage() {
   const matches = listMatches()
   const teams = listTeams()
   const players = listPlayers()
+  const formatOptions = Array.from(new Set(matches.map((match) => match.format).filter(Boolean)))
+  const competitionOptions = Array.from(new Set(matches.map((match) => match.competitionType).filter(Boolean)))
   const [homeFilter, setHomeFilter] = useState('all')
   const [awayFilter, setAwayFilter] = useState('all')
   const [formatFilter, setFormatFilter] = useState('all')
@@ -51,8 +53,7 @@ export function MatchesPage() {
           Format
           <select value={formatFilter} onChange={(event) => setFormatFilter(event.target.value)}>
             <option value="all">All formats</option>
-            <option value="5v5">5v5</option>
-            <option value="6v6">6v6</option>
+            {formatOptions.map((format) => <option key={format} value={format}>{format}</option>)}
           </select>
         </label>
         <label>
@@ -75,8 +76,7 @@ export function MatchesPage() {
           Competition
           <select value={competitionFilter} onChange={(event) => setCompetitionFilter(event.target.value)}>
             <option value="all">All competition types</option>
-            <option value="League">League</option>
-            <option value="Cup">Cup</option>
+            {competitionOptions.map((competitionType) => <option key={competitionType} value={competitionType}>{competitionType}</option>)}
           </select>
         </label>
       </section>

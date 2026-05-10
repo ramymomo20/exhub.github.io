@@ -78,3 +78,16 @@ python scripts/sync_from_postgres.py
 ```
 
 Run that every 2-5 minutes from cron, a panel scheduler, or a small worker process. Do not query Supabase from frontend pages or public API request handlers.
+
+## Frontend API Base URL
+
+The hub frontend now reads from this API instead of local mock data.
+
+- If the frontend and API are served on the same host behind the same origin, no extra frontend API setting is required.
+- If the frontend is served separately, set:
+
+```env
+VITE_HUB_API_BASE_URL=https://your-api-host
+```
+
+The frontend will call endpoints like `/api/players`, `/api/teams`, `/api/matches`, `/api/tournaments`, and `/api/media` against that base URL.

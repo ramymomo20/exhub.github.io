@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { FormPills, PageIntro, PageTrail, PlayerInlineLink, TeamInlineLink, Widget } from '../components/ui'
-import { listPlayers, listTeams } from '../data/repository'
+import { listMatches, listPlayers, listTeams } from '../data/repository'
 
 export function RankingsPage() {
   const players = listPlayers()
   const teams = listTeams()
+  const matches = listMatches()
   const [category, setCategory] = useState('overall')
   const [homeTeamId, setHomeTeamId] = useState('aether-fc')
   const [awayTeamId, setAwayTeamId] = useState('velora-athletic')
@@ -29,6 +30,33 @@ export function RankingsPage() {
   const teamAway = teams.find((team) => team.id === awayTeamId)
   const playerLeft = players.find((player) => player.id === leftPlayerId)
   const playerRight = players.find((player) => player.id === rightPlayerId)
+  const headToHeadMatches = matches
+    .filter((match) => (
+      (match.homeTeamId === homeTeamId && match.awayTeamId === awayTeamId)
+      || (match.homeTeamId === awayTeamId && match.awayTeamId === homeTeamId)
+    ))
+    .slice()
+    .sort((left, right) => new Date(right.date) - new Date(left.date))
+  const headToHeadSummary = headToHeadMatches.reduce((accumulator, match) => {
+    const homePerspective = match.homeTeamId === homeTeamId
+    const homeGoals = homePerspective ? match.homeScore : match.awayScore
+    const awayGoals = homePerspective ? match.awayScore : match.homeScore
+
+    accumulator.homeGoals += homeGoals
+    accumulator.awayGoals += awayGoals
+
+    if (homeGoals > awayGoals) accumulator.homeWins += 1
+    else if (homeGoals < awayGoals) accumulator.awayWins += 1
+    else accumulator.draws += 1
+
+    return accumulator
+  }, {
+    homeWins: 0,
+    awayWins: 0,
+    draws: 0,
+    homeGoals: 0,
+    awayGoals: 0,
+  })
 
   return (
     <div className="page-stack">
@@ -101,7 +129,7 @@ export function RankingsPage() {
             </div>
             <div className="comparison-card-team-center">
               <strong>Last 5 meetings</strong>
-              <small>2 wins each | 1 draw</small>
+              <small>{headToHeadSummary.homeWins} wins | {headToHeadSummary.awayWins} wins | {headToHeadSummary.draws} draws</small>
             </div>
             <div className="comparison-card-team-side">
               <TeamInlineLink teamId={teamAway?.id} compact />
@@ -111,8 +139,8 @@ export function RankingsPage() {
             <div className="comparison-row comparison-row-standalone"><strong>{teamHome?.avgRating?.toFixed(1)}</strong><span>Average rating</span><strong>{teamAway?.avgRating?.toFixed(1)}</strong></div>
             <div className="comparison-row comparison-row-standalone"><strong>{Math.round((teamHome?.wins / teamHome?.appearances) * 100) || 0}%</strong><span>Win rate</span><strong>{Math.round((teamAway?.wins / teamAway?.appearances) * 100) || 0}%</strong></div>
             <div className="comparison-row comparison-row-standalone"><strong>{teamHome?.wins}</strong><span>Overall wins</span><strong>{teamAway?.wins}</strong></div>
-            <div className="comparison-row comparison-row-standalone"><strong>7</strong><span>Meetings played</span><strong>7</strong></div>
-            <div className="comparison-row comparison-row-standalone"><strong>9</strong><span>Goals in meetings</span><strong>8</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{headToHeadMatches.length}</strong><span>Meetings played</span><strong>{headToHeadMatches.length}</strong></div>
+            <div className="comparison-row comparison-row-standalone"><strong>{headToHeadSummary.homeGoals}</strong><span>Goals in meetings</span><strong>{headToHeadSummary.awayGoals}</strong></div>
           </div>
         </Widget>
 

@@ -1,6 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Crest, FormPills, PageTrail, PlayerBadge, PlayerInlineLink, StatChip, Widget } from '../components/ui'
-import { getPlayerById, getTeamById, listMatchesByTeamId, listPlayersByTeamId, listTournaments } from '../data/repository'
+import { getPlayerById, getTeamById, listMatchesByTeamId, listPlayersByTeamId } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
 export function TeamProfilePage() {
@@ -13,10 +13,11 @@ export function TeamProfilePage() {
 
   const squad = listPlayersByTeamId(team.id)
   const recent = listMatchesByTeamId(team.id).slice(0, 5)
-  const latestTournament = listTournaments().find((tournament) => tournament.id === 'iosca-premier-season')
   const aggregated = buildTeamStatistics(squad)
   const captain = getPlayerById(squad.find((player) => player.name === team.captain)?.id ?? '')
   const groupedSquad = groupSquadByUnit(squad)
+  const recentCompetitions = Array.from(new Set(recent.map((match) => match.competition).filter(Boolean)))
+  const currentCompetition = recent[0]?.competition ?? team.competition
 
   return (
     <div className="page-stack">
@@ -45,7 +46,7 @@ export function TeamProfilePage() {
         <div className="profile-summary">
           <StatChip label="Appearances" value={team.appearances} tone="neutral" />
           <StatChip label="Players" value={team.playerCount} tone="info" />
-          <StatChip label="Win Rate" value={`${Math.round((team.wins / team.appearances) * 100)}%`} tone="success" />
+          <StatChip label="Win Rate" value={`${team.appearances > 0 ? Math.round((team.wins / team.appearances) * 100) : 0}%`} tone="success" />
           <StatChip label="Rank" value={`#${team.rank}`} tone="positive" />
         </div>
       </section>
@@ -118,8 +119,8 @@ export function TeamProfilePage() {
 
         <Widget title="Current Tournament">
           <div className="tournament-summary-card">
-            <strong>{latestTournament?.name}</strong>
-            <p>Current place #{team.rank}</p>
+            <strong>{currentCompetition}</strong>
+            <p>Current rank #{team.rank}</p>
             <small>{team.wins} wins | {team.draws} draws | {team.losses} losses</small>
           </div>
         </Widget>
@@ -143,18 +144,19 @@ export function TeamProfilePage() {
         </Widget>
 
         <Widget title="Tournament History">
-          <div className="timeline">
-            <div className="timeline-item">
-              <strong>IOSCA Champions Cup</strong>
-              <p>Reached semi finals</p>
-              <small>Knockout record 3W 1L</small>
+          {recentCompetitions.length ? (
+            <div className="timeline">
+              {recentCompetitions.map((competition) => (
+                <div key={competition} className="timeline-item">
+                  <strong>{competition}</strong>
+                  <p>{team.wins} wins | {team.draws} draws | {team.losses} losses</p>
+                  <small>{team.goalsFor} goals scored | {team.goalsAgainst} conceded</small>
+                </div>
+              ))}
             </div>
-            <div className="timeline-item">
-              <strong>Founder&apos;s Shield</strong>
-              <p>Runners up</p>
-              <small>Finished with the silver medal.</small>
-            </div>
-          </div>
+          ) : (
+            <p>No synced tournament history for this team yet.</p>
+          )}
         </Widget>
       </section>
     </div>

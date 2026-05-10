@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useHubData } from '../data/repository'
 
 const navItems = [
   { to: '/', label: 'Home', end: true },
@@ -9,16 +10,20 @@ const navItems = [
   { to: '/tournaments', label: 'Tournaments' },
   { to: '/records', label: 'Records' },
   { to: '/media', label: 'Media' },
-  { to: '/discord', label: 'Discord' },
+  { href: 'https://discord.gg/HxAJHK9qW9', label: 'Discord', external: true },
 ]
 
 export function AppShell() {
+  const { loading, error } = useHubData()
   const brandIcon = `${import.meta.env.BASE_URL}icons/iosca-icon.png`
+  const discordIcon = `${import.meta.env.BASE_URL}icons/discord-icon.png`
+  const githubIcon = `${import.meta.env.BASE_URL}icons/github-icon.png`
+  const steamIcon = `${import.meta.env.BASE_URL}icons/steam-icon.png`
   const socialLinks = [
-    { href: '/', label: 'About', icon: 'A', internal: true },
-    { href: '/discord', label: 'Discord', icon: 'D', internal: true },
-    { href: 'https://github.com/ramymomo20/exhub.github-io', label: 'GitHub', icon: 'GH' },
-    { href: 'https://store.steampowered.com/app/673560/IOSoccer/', label: 'Steam', icon: 'ST' },
+    { href: '/', label: 'About', internal: true },
+    { href: 'https://discord.gg/HxAJHK9qW9', label: 'Discord', icon: discordIcon },
+    { href: 'https://github.com/ramymomo20/exhub.github-io', label: 'GitHub', icon: githubIcon },
+    { href: 'https://store.steampowered.com/app/673560/IOSoccer/', label: 'Steam', icon: steamIcon },
   ]
 
   return (
@@ -39,26 +44,52 @@ export function AppShell() {
 
         <nav className="main-nav" aria-label="Primary">
           {navItems.map((item) => (
-            <NavLink
-              key={item.label}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => `nav-link${isActive ? ' is-active' : ''}`}
-            >
-              {item.label}
-            </NavLink>
+            item.external ? (
+              <a
+                key={item.label}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="nav-link nav-link-discord"
+              >
+                {item.label}
+              </a>
+            ) : (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => `nav-link${isActive ? ' is-active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            )
           ))}
         </nav>
-
-        <div className="topbar-tools">
-          <button className="tool-chip" type="button">Search</button>
-          <button className="tool-chip" type="button">Alerts</button>
-          <button className="profile-chip" type="button" aria-label="Profile">IO</button>
-        </div>
       </header>
 
       <main className="page-wrap">
-        <Outlet />
+        {loading ? (
+          <div className="page-stack">
+            <section className="card widget">
+              <div className="widget-head">
+                <h2>Loading Hub Data</h2>
+              </div>
+              <p>Connecting the site to the live hub read model.</p>
+            </section>
+          </div>
+        ) : error ? (
+          <div className="page-stack">
+            <section className="card widget">
+              <div className="widget-head">
+                <h2>Hub Data Unavailable</h2>
+              </div>
+              <p>{error}</p>
+            </section>
+          </div>
+        ) : (
+          <Outlet />
+        )}
       </main>
 
       <footer className="site-footer">
@@ -70,12 +101,13 @@ export function AppShell() {
           {socialLinks.map((link) => (
             link.internal ? (
               <NavLink key={link.label} className="footer-link footer-link-icon" to={link.href}>
-                <span className="footer-link-mark">{link.icon}</span>
                 <span>{link.label}</span>
               </NavLink>
             ) : (
               <a key={link.label} className="footer-link footer-link-icon" href={link.href} target="_blank" rel="noreferrer">
-                <span className="footer-link-mark">{link.icon}</span>
+                <span className="footer-link-mark">
+                  <img src={link.icon} alt="" />
+                </span>
                 <span>{link.label}</span>
               </a>
             )
