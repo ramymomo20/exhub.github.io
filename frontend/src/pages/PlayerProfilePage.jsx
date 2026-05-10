@@ -10,13 +10,10 @@ export function PlayerProfilePage() {
   const player = getPlayerById(playerId)
   const [page, setPage] = useState(0)
   const steamIcon = `${import.meta.env.BASE_URL}icons/steam-icon.png`
-<<<<<<< HEAD
 
   if (!player && loading) {
     return null
   }
-=======
->>>>>>> 12d1100f5456f2a18a6c24991a67e852b5099d84
 
   if (!player) {
     return <Navigate to="/players" replace />
