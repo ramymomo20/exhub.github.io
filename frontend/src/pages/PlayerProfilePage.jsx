@@ -8,6 +8,7 @@ export function PlayerProfilePage() {
   const { playerId } = useParams()
   const player = getPlayerById(playerId)
   const [page, setPage] = useState(0)
+  const steamIcon = `${import.meta.env.BASE_URL}icons/steam-icon.png`
 
   if (!player) {
     return <Navigate to="/players" replace />
@@ -41,8 +42,15 @@ export function PlayerProfilePage() {
           <div className="profile-badges">
             <TeamInlineLink teamId={player.teamId} />
             <FormPills values={getPlayerForm(matchLogs, player.id)} />
-            <a className="steam-redirect-badge" href={`https://steamcommunity.com/id/${player.id}`} target="_blank" rel="noreferrer" aria-label="Open Steam profile">
-              <span>↗</span>
+            <a
+              className="steam-redirect-badge steam-redirect-badge-wide"
+              href={`https://steamcommunity.com/id/${player.id}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open Steam profile"
+            >
+              <img src={steamIcon} alt="" />
+              <span>Steam Profile</span>
             </a>
           </div>
           <div className="profile-focus-grid">

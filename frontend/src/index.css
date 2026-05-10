@@ -3925,3 +3925,115 @@ th { color: var(--text-faint); font-weight: 600; }
     height: 20px;
   }
 }
+
+.topbar {
+  grid-template-columns: auto 1fr;
+}
+
+.quick-stat-rich {
+  align-content: start;
+  gap: 12px;
+}
+
+.quick-stat-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.quick-stat-avatar {
+  flex: 0 0 auto;
+}
+
+.quick-stat-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.quick-stat-copy small {
+  color: var(--text-faint);
+}
+
+.quick-stat-name-link {
+  display: block;
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.pitch-shell-match .pitch-spot-top {
+  top: 108px;
+}
+
+.pitch-shell-match .pitch-spot-bottom {
+  bottom: 108px;
+}
+
+.steam-redirect-badge-wide {
+  width: auto;
+  min-height: 38px;
+  padding: 0 14px;
+  gap: 8px;
+  border-radius: 999px;
+}
+
+.steam-redirect-badge-wide img,
+.footer-link-mark img,
+.media-thumb-icon img,
+.ghost-button-icon img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.footer-link-mark img {
+  width: 20px;
+  height: 20px;
+}
+
+.media-thumb-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(7, 11, 20, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.ghost-button-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-cta-row {
+  margin-top: 18px;
+}
+
+.footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: flex-start;
+}
+
+.footer-link-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-link-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 960px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+}

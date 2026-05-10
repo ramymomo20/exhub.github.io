@@ -3,6 +3,7 @@ import { getDiscordOverview } from '../data/repository'
 
 export function DiscordPage() {
   const discord = getDiscordOverview()
+  const inviteUrl = 'https://discord.gg/HxAJHK9qW9'
 
   return (
     <div className="page-stack">
@@ -37,6 +38,9 @@ export function DiscordPage() {
             <li>Matchday channels support live coordination and dispute resolution.</li>
             <li>Highlights and clips feed the media page and future archives.</li>
           </ul>
+          <div className="widget-cta-row">
+            <a className="accent-link" href={inviteUrl} target="_blank" rel="noreferrer">Open invite</a>
+          </div>
         </Widget>
       </section>
     </div>

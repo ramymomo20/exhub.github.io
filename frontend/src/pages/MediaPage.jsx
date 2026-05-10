@@ -7,6 +7,9 @@ export function MediaPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [lengthFilter, setLengthFilter] = useState('all')
   const [activeItem, setActiveItem] = useState(null)
+  const downloadIcon = `${import.meta.env.BASE_URL}icons/download-icon.png`
+  const imageIcon = `${import.meta.env.BASE_URL}icons/image-icon.png`
+  const videoIcon = `${import.meta.env.BASE_URL}icons/video-icon.png`
   const filtered = useMemo(() => media.filter((item) => (
     (typeFilter === 'all' || item.group === typeFilter) &&
     (lengthFilter === 'all' || item.lengthBucket === lengthFilter)
@@ -42,6 +45,9 @@ export function MediaPage() {
           {filtered.map((item) => (
             <article key={item.id} className={`card media-card accent-${item.accent}`}>
               <button type="button" className="media-thumb media-thumb-rich" onClick={() => setActiveItem(item)}>
+                <span className="media-thumb-icon">
+                  <img src={item.group === 'screenshots' ? imageIcon : videoIcon} alt="" />
+                </span>
                 <span className="media-thumb-type">{item.type}</span>
                 <span className="media-thumb-title">{item.title}</span>
               </button>
@@ -52,7 +58,10 @@ export function MediaPage() {
                 <div className="media-actions">
                   <button type="button" className="ghost-button" onClick={() => setActiveItem(item)}>Open</button>
                   <a className="ghost-button" href={item.assetUrl} target="_blank" rel="noreferrer">New tab</a>
-                  <a className="ghost-button" href={item.assetUrl} download>Download</a>
+                  <a className="ghost-button ghost-button-icon" href={item.assetUrl} download>
+                    <img src={downloadIcon} alt="" />
+                    <span>Download</span>
+                  </a>
                 </div>
               </div>
             </article>
