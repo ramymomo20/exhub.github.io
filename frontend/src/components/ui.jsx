@@ -5,7 +5,7 @@ import { getRatingToneClass } from '../utils/rating'
 const ICON_BASE = `${import.meta.env.BASE_URL}icons/`
 const ICON_MAP = {
   goal: `${ICON_BASE}soccer-ball-icon.png`,
-  'own-goal': `${ICON_BASE}soccer-ball-icon.png`,
+  'own-goal': `${ICON_BASE}owngoal_image.png`,
   'yellow-card': `${ICON_BASE}yellow-card-icon.png`,
   'second-yellow': `${ICON_BASE}second-yellow-card-icon.png`,
   second_yellow: `${ICON_BASE}second-yellow-card-icon.png`,
