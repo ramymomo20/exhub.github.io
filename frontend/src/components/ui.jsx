@@ -376,9 +376,9 @@ const FORMATIONS = {
   '8v8': [
     { pos: 'GK', x: 50, y: 86 },
     { pos: 'LB', x: 18, y: 68 },
-    { pos: 'CB', x: 50, y: 67 },
+    { pos: 'CB', x: 50, y: 66.2 },
     { pos: 'RB', x: 82, y: 68 },
-    { pos: 'CM', x: 50, y: 49 },
+    { pos: 'CM', x: 50, y: 47.4 },
     { pos: 'LW', x: 22, y: 26 },
     { pos: 'CF', x: 50, y: 21 },
     { pos: 'RW', x: 78, y: 26 },

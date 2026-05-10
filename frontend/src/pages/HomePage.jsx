@@ -154,8 +154,12 @@ function buildTeamOfWeekLineup(players, matches) {
     CF: ['CF', 'CM', 'RW', 'LW'],
     RW: ['RW', 'RM', 'LW'],
   }
+<<<<<<< HEAD
   const detailedMatches = matches.filter((match) => Array.isArray(match.performances) && match.performances.length > 0)
   const latestMatchDate = detailedMatches.reduce((latest, match) => {
+=======
+  const latestMatchDate = matches.reduce((latest, match) => {
+>>>>>>> 12d1100f5456f2a18a6c24991a67e852b5099d84
     const parsed = new Date(match.date)
     return Number.isNaN(parsed.getTime()) || parsed < latest ? latest : parsed
   }, new Date('2026-05-01T00:00:00'))
@@ -163,7 +167,11 @@ function buildTeamOfWeekLineup(players, matches) {
   threshold.setDate(threshold.getDate() - 7)
 
   const activePlayerIds = new Set(
+<<<<<<< HEAD
     detailedMatches
+=======
+    matches
+>>>>>>> 12d1100f5456f2a18a6c24991a67e852b5099d84
       .filter((match) => {
         const parsed = new Date(match.date)
         return !Number.isNaN(parsed.getTime()) && parsed >= threshold
@@ -173,7 +181,11 @@ function buildTeamOfWeekLineup(players, matches) {
   )
 
   const activePlayers = players
+<<<<<<< HEAD
     .filter((player) => activePlayerIds.size ? activePlayerIds.has(player.id) : true)
+=======
+    .filter((player) => activePlayerIds.has(player.id))
+>>>>>>> 12d1100f5456f2a18a6c24991a67e852b5099d84
     .sort((left, right) => right.rating - left.rating)
   const used = new Set()
 
