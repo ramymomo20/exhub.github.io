@@ -78,6 +78,9 @@ function getApiBaseUrl() {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8000'
     }
+    if (hostname === 'ramymomo20.github.io') {
+      return 'https://iosca-api.sparked.network'
+    }
   }
 
   return ''
@@ -97,6 +100,32 @@ async function fetchJson(path) {
   }
 
   return response.json()
+}
+
+async function fetchJsonOrDefault(path, fallbackValue) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (response.status === 404) {
+    return fallbackValue
+  }
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+async function fetchJsonSettled(path, fallbackValue = []) {
+  try {
+    return await fetchJson(path)
+  } catch (error) {
+    return { __hubFetchError: error, __hubFallback: fallbackValue }
+  }
 }
 
 function indexById(items) {
@@ -155,13 +184,23 @@ async function ensureBootstrapLoaded() {
   }))
 
   bootstrapPromise = Promise.all([
-    fetchJson('/api/teams?limit=250'),
-    fetchJson('/api/players?limit=250'),
-    fetchJson('/api/matches?limit=200'),
-    fetchJson('/api/tournaments?limit=100'),
-    fetchJson('/api/media?limit=200'),
+    fetchJsonSettled('/api/teams?limit=250'),
+    fetchJsonSettled('/api/players?limit=250'),
+    fetchJsonSettled('/api/matches?limit=200'),
+    fetchJsonSettled('/api/tournaments?limit=100'),
+    fetchJsonOrDefault('/api/media?limit=200', []),
   ])
-    .then(([rawTeams, rawPlayers, rawMatches, rawTournaments, rawMedia]) => {
+    .then(([teamsResult, playersResult, matchesResult, tournamentsResult, rawMedia]) => {
+      const failedResults = [teamsResult, playersResult, matchesResult, tournamentsResult]
+        .filter((result) => result && result.__hubFetchError)
+      if (failedResults.length === 4) {
+        throw failedResults[0].__hubFetchError
+      }
+
+      const rawTeams = teamsResult?.__hubFetchError ? [] : teamsResult
+      const rawPlayers = playersResult?.__hubFetchError ? [] : playersResult
+      const rawMatches = matchesResult?.__hubFetchError ? [] : matchesResult
+      const rawTournaments = tournamentsResult?.__hubFetchError ? [] : tournamentsResult
       const mappedState = applyDerivedState({
         ...state,
         bootstrapStatus: 'loaded',

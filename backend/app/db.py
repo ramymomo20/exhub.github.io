@@ -35,6 +35,8 @@ async def create_mysql_pool() -> aiomysql.Pool:
         **kwargs,
         minsize=config.MYSQL_POOL_MIN_SIZE,
         maxsize=config.MYSQL_POOL_MAX_SIZE,
+        pool_recycle=config.MYSQL_POOL_RECYCLE_SECONDS,
+        connect_timeout=config.MYSQL_CONNECT_TIMEOUT_SECONDS,
     )
 
 

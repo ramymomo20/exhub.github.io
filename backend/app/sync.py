@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable
@@ -51,11 +52,40 @@ def _stringify_identifier(value: Any) -> str | None:
     return text or None
 
 
+DISCORD_MENTION_RE = re.compile(r"^<@!?(\d+)>$")
+
+
+def _normalize_discord_identifier(value: Any) -> str | None:
+    text = _stringify_identifier(value)
+    if text is None:
+        return None
+
+    lowered = text.lower()
+    if lowered in {"none", "null", "nan", "n/a", "unknown"}:
+        return None
+    if lowered.startswith("unregistered:"):
+        return None
+
+    mention_match = DISCORD_MENTION_RE.fullmatch(text)
+    if mention_match:
+        return mention_match.group(1)
+
+    return text if text.isdigit() else None
+
+
 def _normalize_identifier_fields(rows: list[dict[str, Any]], *field_names: str) -> list[dict[str, Any]]:
     for row in rows:
         for field_name in field_names:
             if field_name in row:
                 row[field_name] = _stringify_identifier(row.get(field_name))
+    return rows
+
+
+def _normalize_discord_identifier_fields(rows: list[dict[str, Any]], *field_names: str) -> list[dict[str, Any]]:
+    for row in rows:
+        for field_name in field_names:
+            if field_name in row:
+                row[field_name] = _normalize_discord_identifier(row.get(field_name))
     return rows
 
 
@@ -289,7 +319,8 @@ async def sync_players(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> Sync
         """,
         *params,
     ))
-    _normalize_identifier_fields(rows, "steam_id", "discord_id")
+    _normalize_identifier_fields(rows, "steam_id")
+    _normalize_discord_identifier_fields(rows, "discord_id")
     max_source_updated_at = _max_source_updated_at(rows)
 
     return SyncResult(
@@ -334,7 +365,8 @@ async def sync_teams(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncRe
         """,
         *params,
     ))
-    _normalize_identifier_fields(rows, "guild_id", "captain_discord_id")
+    _normalize_identifier_fields(rows, "guild_id")
+    _normalize_discord_identifier_fields(rows, "captain_discord_id")
     for row in rows:
         row["short_name"] = _short_name(row.get("name"))
     max_source_updated_at = _max_source_updated_at(rows)

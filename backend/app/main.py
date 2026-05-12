@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -194,23 +195,52 @@ MATCH_SELECT_FROM = """
 
 
 async def fetch_all(request: Request, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-    async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
-        await cur.execute(sql, params)
-        return public_rows(await cur.fetchall())
+    try:
+        async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
+            await asyncio.wait_for(
+                cur.execute(sql, params),
+                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
+            )
+            return public_rows(
+                await asyncio.wait_for(
+                    cur.fetchall(),
+                    timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
+                )
+            )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
 
 
 async def fetch_one(request: Request, sql: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
-    async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
-        await cur.execute(sql, params)
-        row = await cur.fetchone()
-        return public_row(dict(row)) if row else None
+    try:
+        async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
+            await asyncio.wait_for(
+                cur.execute(sql, params),
+                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
+            )
+            row = await asyncio.wait_for(
+                cur.fetchone(),
+                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
+            )
+            return public_row(dict(row)) if row else None
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
 
 
 @app.get("/health")
 async def health(request: Request):
-    async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
-        await cur.execute("SELECT 1 AS ok")
-        row = await cur.fetchone()
+    try:
+        async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
+            await asyncio.wait_for(
+                cur.execute("SELECT 1 AS ok"),
+                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
+            )
+            row = await asyncio.wait_for(
+                cur.fetchone(),
+                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
+            )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
     return {"ok": bool(row and row.get("ok") == 1)}
 
 

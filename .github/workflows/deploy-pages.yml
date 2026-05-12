@@ -18,6 +18,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_HUB_API_BASE_URL: https://iosca-api.sparked.network
     defaults:
       run:
         working-directory: frontend
