@@ -5,7 +5,7 @@ import { getPlayerById } from '../data/repository'
 
 const JERSEY_ICON = `${import.meta.env.BASE_URL}icons/jersey-icon.png`
 
-const SHOT_FILTERS = ['goal', 'save', 'miss', 'yellow-card', 'second_yellow', 'red-card', 'own-goal']
+const SHOT_FILTERS = ['goal', 'save', 'miss', 'own-goal']
 
 const FORMATION_COORDS = {
   '5v5': [
@@ -679,12 +679,12 @@ function buildHeadToHeadModel(match) {
   const awayPassAccuracy = getComparisonValue(match.comparisonStats, 'Pass accuracy', 'away')
   const homePasses = getComparisonValue(match.comparisonStats, 'Passes', 'home') || inferAttempts(homePassCompleted, homePassAccuracy)
   const awayPasses = getComparisonValue(match.comparisonStats, 'Passes', 'away') || inferAttempts(awayPassCompleted, awayPassAccuracy)
-  const homeSaves = Math.max(0, awayShotsOnGoal - match.awayScore)
-  const awaySaves = Math.max(0, homeShotsOnGoal - match.homeScore)
-  const homeYellowCards = countLineupEvent(match.lineups.home, 'yellow-card') + countLineupEvent(match.lineups.home, 'second_yellow')
-  const awayYellowCards = countLineupEvent(match.lineups.away, 'yellow-card') + countLineupEvent(match.lineups.away, 'second_yellow')
-  const homeRedCards = countLineupEvent(match.lineups.home, 'red-card')
-  const awayRedCards = countLineupEvent(match.lineups.away, 'red-card')
+  const homeSaves = getComparisonValue(match.comparisonStats, 'Saves', 'home')
+  const awaySaves = getComparisonValue(match.comparisonStats, 'Saves', 'away')
+  const homeYellowCards = getComparisonValue(match.comparisonStats, 'Yellow Cards', 'home')
+  const awayYellowCards = getComparisonValue(match.comparisonStats, 'Yellow Cards', 'away')
+  const homeRedCards = getComparisonValue(match.comparisonStats, 'Red Cards', 'home')
+  const awayRedCards = getComparisonValue(match.comparisonStats, 'Red Cards', 'away')
 
   const rows = HEAD_TO_HEAD_LABELS.map((label) => {
     switch (label) {
@@ -727,167 +727,49 @@ function buildHeadToHeadModel(match) {
 }
 
 function buildMatchPlayerStatRows(match, side) {
-  const isHome = side === 'home'
-  const lineup = isHome ? match.lineups.home : match.lineups.away
-  const goalsConceded = isHome ? match.awayScore : match.homeScore
+  const lineup = side === 'home' ? match.lineups.home : match.lineups.away
   const performances = match.performances ?? []
 
   return lineup.map((entry, index) => {
     const player = entry.playerId ? getPlayerById(entry.playerId) : null
-    const seasonStats = player?.stats ?? {}
-    const performance = performances.find((item) => item.playerId && item.playerId === entry.playerId) ?? {}
-    const badges = badgesToEvents(entry.badges ?? [])
+    const performance = performances.find((item) => item.playerId && item.playerId === entry.playerId) ?? null
     const position = normalizeRole(entry.role)
-    const rating = Number(entry.rating ?? 7)
-    const passes = derivePasses(position, rating, seasonStats)
-    const completionPct = deriveCompletionPct(position, seasonStats)
-    const completed = Math.min(passes, Math.round(passes * (completionPct / 100)))
-    const goals = performance.goals ?? badges.goals
-    const assists = performance.assists ?? badges.assists
-    const saves = performance.saves ?? badges.saves
-    const shots = deriveShots(position, rating, goals, assists)
-    const onTarget = Math.min(shots, Math.max(goals, Math.round(shots * 0.6)))
-    const secondAssists = goals === 0 && assists > 0 ? 1 : Math.min(1, Math.round((seasonStats.secondAssists ?? 0) / 12))
-    const keyPasses = Math.max(assists, Math.round(passes * (position === 'GK' ? 0.03 : 0.08)))
-    const chancesCreated = Math.max(assists, keyPasses - (position === 'GK' ? 0 : 1))
-    const interceptions = performance.interceptions ?? deriveInterceptions(position, rating)
-    const possessions = derivePossessions(position, rating)
-    const offsides = position === 'CF' || position === 'LW' || position === 'RW' || position === 'LM' || position === 'RM' ? Math.max(0, Math.round((rating - 6.5) / 1.5)) : 0
-    const distance = `${deriveDistance(position, rating).toFixed(2)}km`
-    const fouls = deriveFouls(position)
-    const foulsSuffered = Math.max(0, assists + Math.round(rating / 4) - 1)
-    const ownGoals = badges.ownGoals
-    const yellowCards = badges.yellowCards + badges.secondYellowCards
-    const redCards = badges.redCards
-    const corners = ['LW', 'RW', 'LM', 'RM', 'CM'].includes(position) ? assists + (goals > 0 ? 1 : 0) : 0
-    const throwIns = ['LB', 'RB'].includes(position) ? 2 : 0
-    const freeKicks = ['CM', 'CF', 'LW', 'RW'].includes(position) ? Math.max(0, assists) : 0
-    const goalKicks = position === 'GK' ? Math.max(2, goalsConceded + 2) : 0
-    const penalties = goals > 0 && position === 'CF' ? 1 : 0
+    const goalsConceded = performance?.goalsConceded ?? (position === 'GK' ? (side === 'home' ? match.awayScore : match.homeScore) : 0)
+    const distance = performance ? performance.distance : '0.00km'
+    const completionPct = Number(performance?.completionPct ?? 0)
 
     return {
       id: `${side}-${entry.playerId ?? entry.player ?? index}`,
       player: player?.name ?? entry.player ?? `Starter ${index + 1}`,
       position,
-      goals,
-      shots,
-      onTarget,
-      assists,
-      secondAssists,
-      keyPasses,
-      chancesCreated,
-      passes,
-      completed,
+      goals: performance?.goals ?? 0,
+      shots: performance?.shots ?? 0,
+      onTarget: performance?.onTarget ?? 0,
+      assists: performance?.assists ?? 0,
+      secondAssists: performance?.secondAssists ?? 0,
+      keyPasses: performance?.keyPasses ?? 0,
+      chancesCreated: performance?.chancesCreated ?? 0,
+      passes: performance?.passes ?? 0,
+      completed: performance?.completed ?? 0,
       completionPct: `${completionPct}%`,
-      interceptions,
-      possessions,
-      saves,
-      offsides,
+      interceptions: performance?.interceptions ?? 0,
+      possessions: performance?.possessions ?? 0,
+      saves: performance?.saves ?? 0,
+      offsides: performance?.offsides ?? 0,
       distance,
-      fouls,
-      foulsSuffered,
-      ownGoals,
-      goalsConceded: position === 'GK' ? goalsConceded : 0,
-      corners,
-      throwIns,
-      freeKicks,
-      goalKicks,
-      penalties,
-      yellowCards,
-      redCards,
+      fouls: performance?.fouls ?? 0,
+      foulsSuffered: performance?.foulsSuffered ?? 0,
+      ownGoals: performance?.ownGoals ?? 0,
+      goalsConceded,
+      corners: performance?.corners ?? 0,
+      throwIns: performance?.throwIns ?? 0,
+      freeKicks: performance?.freeKicks ?? 0,
+      goalKicks: performance?.goalKicks ?? 0,
+      penalties: performance?.penalties ?? 0,
+      yellowCards: performance?.yellowCards ?? 0,
+      redCards: performance?.redCards ?? 0,
     }
   })
-}
-
-function derivePasses(position, rating, seasonStats) {
-  if (seasonStats.passesCompleted) {
-    const baseline = seasonStats.passesCompleted / Math.max(1, seasonStats.appearances ?? 1)
-    return Math.max(12, Math.round(baseline))
-  }
-
-  const byRole = {
-    GK: 18,
-    LB: 24,
-    CB: 26,
-    RB: 24,
-    CM: 30,
-    LM: 22,
-    RM: 22,
-    LW: 21,
-    RW: 21,
-    CF: 18,
-  }
-
-  return Math.max(12, Math.round((byRole[position] ?? 20) + (rating - 7) * 3))
-}
-
-function deriveCompletionPct(position, seasonStats) {
-  if (seasonStats.passAccuracy) {
-    return Math.round(seasonStats.passAccuracy)
-  }
-
-  const byRole = {
-    GK: 82,
-    LB: 80,
-    CB: 83,
-    RB: 80,
-    CM: 86,
-    LM: 79,
-    RM: 79,
-    LW: 76,
-    RW: 76,
-    CF: 74,
-  }
-
-  return byRole[position] ?? 78
-}
-
-function deriveShots(position, rating, goals, assists) {
-  const base = ['CF', 'LW', 'RW', 'LM', 'RM'].includes(position) ? 3 : position === 'CM' ? 2 : 1
-  return Math.max(goals, base + Math.max(0, Math.round(rating - 7)) + assists)
-}
-
-function deriveInterceptions(position, rating) {
-  const base = {
-    GK: 0,
-    LB: 4,
-    CB: 6,
-    RB: 4,
-    CM: 5,
-    LM: 2,
-    RM: 2,
-    LW: 1,
-    RW: 1,
-    CF: 1,
-  }
-
-  return Math.max(0, (base[position] ?? 2) + Math.round((rating - 7) * 2))
-}
-
-function derivePossessions(position, rating) {
-  const base = ['CF', 'LW', 'RW'].includes(position) ? 9 : ['CM', 'LM', 'RM'].includes(position) ? 7 : ['LB', 'CB', 'RB'].includes(position) ? 5 : 3
-  return Math.max(1, base + Math.round((rating - 7) * 1.5))
-}
-
-function deriveDistance(position, rating) {
-  const base = {
-    GK: 1.9,
-    LB: 6.9,
-    CB: 6.4,
-    RB: 6.9,
-    CM: 7.8,
-    LM: 7.3,
-    RM: 7.3,
-    LW: 7.1,
-    RW: 7.1,
-    CF: 6.7,
-  }
-
-  return Math.max(1.5, (base[position] ?? 6.2) + (rating - 7) * 0.32)
-}
-
-function deriveFouls(position) {
-  return ['CB', 'LB', 'RB'].includes(position) ? 1 : 0
 }
 
 function getComparisonValue(rows, label, side) {
@@ -899,12 +781,6 @@ function getComparisonValue(rows, label, side) {
 function inferAttempts(completed, accuracy) {
   if (!completed || !accuracy) return 0
   return Math.round(completed / (accuracy / 100))
-}
-
-function countLineupEvent(lineup, type) {
-  return lineup.reduce((total, entry) => (
-    total + (entry.badges?.find((badge) => badge.type === type)?.count ?? 0)
-  ), 0)
 }
 
 function toAccuracy(success, attempts) {

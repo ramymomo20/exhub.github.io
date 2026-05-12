@@ -3,6 +3,9 @@ import { useEffect, useSyncExternalStore } from 'react'
 const positionOptions = ['GK', 'LB', 'CB', 'RB', 'CM', 'LM', 'RM', 'LW', 'RW', 'CF']
 
 const listeners = new Set()
+const DEFAULT_PAGE_SIZE = 200
+const TEAM_PAGE_SIZE = 250
+const MAX_PAGINATION_PAGES = 50
 
 let bootstrapPromise = null
 const playerDetailPromises = new Map()
@@ -128,6 +131,64 @@ async function fetchJsonSettled(path, fallbackValue = []) {
   }
 }
 
+async function settleTask(task, fallbackValue = []) {
+  try {
+    return await task
+  } catch (error) {
+    return { __hubFetchError: error, __hubFallback: fallbackValue }
+  }
+}
+
+function withPagination(path, limit, offset) {
+  const separator = path.includes('?') ? '&' : '?'
+  return `${path}${separator}limit=${limit}&offset=${offset}`
+}
+
+async function fetchAllPages(path, pageSize = DEFAULT_PAGE_SIZE) {
+  const items = []
+
+  for (let pageIndex = 0; pageIndex < MAX_PAGINATION_PAGES; pageIndex += 1) {
+    const offset = pageIndex * pageSize
+    const page = await fetchJson(withPagination(path, pageSize, offset))
+
+    if (!Array.isArray(page)) {
+      throw new Error(`Paged request for ${path} did not return an array.`)
+    }
+
+    items.push(...page)
+    if (page.length < pageSize) {
+      break
+    }
+  }
+
+  return items
+}
+
+async function fetchAllPagesOrDefault(path, fallbackValue = [], pageSize = DEFAULT_PAGE_SIZE) {
+  const firstPage = await fetchJsonOrDefault(withPagination(path, pageSize, 0), fallbackValue)
+  if (!Array.isArray(firstPage)) {
+    return fallbackValue
+  }
+  if (firstPage.length < pageSize) {
+    return firstPage
+  }
+
+  const items = [...firstPage]
+  for (let pageIndex = 1; pageIndex < MAX_PAGINATION_PAGES; pageIndex += 1) {
+    const offset = pageIndex * pageSize
+    const page = await fetchJson(withPagination(path, pageSize, offset))
+    if (!Array.isArray(page) || page.length === 0) {
+      break
+    }
+    items.push(...page)
+    if (page.length < pageSize) {
+      break
+    }
+  }
+
+  return items
+}
+
 function indexById(items) {
   return new Map(items.map((item) => [item.id, item]))
 }
@@ -184,11 +245,11 @@ async function ensureBootstrapLoaded() {
   }))
 
   bootstrapPromise = Promise.all([
-    fetchJsonSettled('/api/teams?limit=250'),
-    fetchJsonSettled('/api/players?limit=250'),
-    fetchJsonSettled('/api/matches?limit=200'),
-    fetchJsonSettled('/api/tournaments?limit=100'),
-    fetchJsonOrDefault('/api/media?limit=200', []),
+    settleTask(fetchJson(withPagination('/api/teams', TEAM_PAGE_SIZE, 0))),
+    settleTask(fetchAllPages('/api/players', DEFAULT_PAGE_SIZE)),
+    settleTask(fetchAllPages('/api/matches', DEFAULT_PAGE_SIZE)),
+    settleTask(fetchJson(withPagination('/api/tournaments', 100, 0))),
+    fetchAllPagesOrDefault('/api/media', [], DEFAULT_PAGE_SIZE),
   ])
     .then(([teamsResult, playersResult, matchesResult, tournamentsResult, rawMedia]) => {
       const failedResults = [teamsResult, playersResult, matchesResult, tournamentsResult]
@@ -590,11 +651,13 @@ function mapPlayerSummary(raw) {
     id: String(raw.steam_id),
     name: playerName,
     teamId: raw.current_team_guild_id ? String(raw.current_team_guild_id) : null,
+    teamName: raw.current_team_name ?? null,
     rating: toNumber(raw.rating),
     position: normalizePosition(raw.primary_position, raw),
     portrait: abbreviateLabel(playerName, 2),
     appearances,
     mvps: toNumber(raw.mvp_awards),
+    lastMatchAt: raw.last_match_at ?? null,
     stats: {
       appearances,
       subAppearances: 0,
@@ -620,6 +683,11 @@ function mapPlayerSummary(raw) {
       savePercentage: saves + goalsConceded > 0 ? Math.round((saves / (saves + goalsConceded)) * 100) : 0,
       goalsConceded,
       ownGoals: toNumber(raw.own_goals),
+      corners: toNumber(raw.corners),
+      freeKicks: toNumber(raw.free_kicks),
+      penalties: toNumber(raw.penalties),
+      throwIns: toNumber(raw.throw_ins),
+      goalKicks: toNumber(raw.goal_kicks),
       interceptions: toNumber(raw.interceptions),
       tackles,
       tacklesCompleted: slidingTacklesCompleted,
@@ -722,7 +790,7 @@ function mapMatchDetail(rawMatch) {
     comparisonStats: buildComparisonStats(playerStats),
     gameHighlights: buildGameHighlights(events),
     shotMap: buildShotMap(events),
-    shotZoneMaps: null,
+    shotZoneMaps: buildShotZoneMaps(events),
     lineups,
     lineupTooltips: buildLineupTooltips(playerStats),
     mvpSummary: buildMvpSummary(summary.mvpId, statsByPlayer),
@@ -832,11 +900,11 @@ function mapPerformance(raw) {
     foulsSuffered: toNumber(raw.fouls_suffered),
     ownGoals: toNumber(raw.own_goals),
     goalsConceded: toNumber(raw.goals_conceded),
-    corners: 0,
-    throwIns: 0,
-    freeKicks: 0,
-    goalKicks: 0,
-    penalties: 0,
+    corners: toNumber(raw.corners),
+    throwIns: toNumber(raw.throw_ins),
+    freeKicks: toNumber(raw.free_kicks),
+    goalKicks: toNumber(raw.goal_kicks),
+    penalties: toNumber(raw.penalties),
     yellowCards: toNumber(raw.yellow_cards),
     redCards: toNumber(raw.red_cards),
     position: normalizePosition(raw.position_code),
@@ -856,12 +924,14 @@ function mapEvent(raw, namesByPlayer) {
     teamId: raw.team_guild_id ? String(raw.team_guild_id) : null,
     type,
     minute: toNumber(raw.minute || 0),
+    matchSecond: toNumber(raw.match_second),
+    period: String(raw.period ?? '').trim().toUpperCase(),
     playerId: player1,
     playerName: namesByPlayer.get(player1) ?? player1 ?? 'Unknown',
     assistId: player2,
     assistName: namesByPlayer.get(player2) ?? player2 ?? null,
-    x: normalizeCoordinate(raw.norm_x, raw.x),
-    y: normalizeCoordinate(raw.norm_y, raw.y),
+    normX: toUnitCoordinate(raw.norm_x, raw.x),
+    normY: toUnitCoordinate(raw.norm_y, raw.y),
   }
 }
 
@@ -1020,9 +1090,12 @@ function buildComparisonStats(playerStats) {
     home: aggregateSideStats(playerStats.filter((entry) => entry.teamSide === 'home')),
     away: aggregateSideStats(playerStats.filter((entry) => entry.teamSide === 'away')),
   }
+  const possessionTotal = sides.home.possessionRaw + sides.away.possessionRaw
+  const homePossession = possessionTotal > 0 ? Math.round((sides.home.possessionRaw / possessionTotal) * 100) : 0
+  const awayPossession = possessionTotal > 0 ? Math.max(0, 100 - homePossession) : 0
 
   return [
-    ['Possession', sides.home.possession, sides.away.possession],
+    ['Possession', homePossession, awayPossession],
     ['Shots', sides.home.shots, sides.away.shots],
     ['Shots on target', sides.home.shotsOnTarget, sides.away.shotsOnTarget],
     ['Saves', sides.home.saves, sides.away.saves],
@@ -1030,15 +1103,18 @@ function buildComparisonStats(playerStats) {
     ['Passes completed', sides.home.completed, sides.away.completed],
     ['Pass accuracy', sides.home.passAccuracy, sides.away.passAccuracy],
     ['Interceptions', sides.home.interceptions, sides.away.interceptions],
+    ['Corners', sides.home.corners, sides.away.corners],
     ['Fouls', sides.home.fouls, sides.away.fouls],
     ['Offsides', sides.home.offsides, sides.away.offsides],
+    ['Yellow Cards', sides.home.yellowCards, sides.away.yellowCards],
+    ['Red Cards', sides.home.redCards, sides.away.redCards],
   ]
 }
 
 function aggregateSideStats(rows) {
   if (!rows.length) {
     return {
-      possession: 0,
+      possessionRaw: 0,
       shots: 0,
       shotsOnTarget: 0,
       saves: 0,
@@ -1046,36 +1122,44 @@ function aggregateSideStats(rows) {
       completed: 0,
       passAccuracy: 0,
       interceptions: 0,
+      corners: 0,
       fouls: 0,
       offsides: 0,
+      yellowCards: 0,
+      redCards: 0,
     }
   }
 
   const total = rows.reduce((accumulator, row) => ({
-    possession: accumulator.possession + row.possessions,
+    possessionRaw: accumulator.possessionRaw + row.possessions,
     shots: accumulator.shots + row.shots,
     shotsOnTarget: accumulator.shotsOnTarget + row.onTarget,
     saves: accumulator.saves + row.saves,
     passes: accumulator.passes + row.passes,
     completed: accumulator.completed + row.completed,
     interceptions: accumulator.interceptions + row.interceptions,
+    corners: accumulator.corners + row.corners,
     fouls: accumulator.fouls + row.fouls,
     offsides: accumulator.offsides + row.offsides,
+    yellowCards: accumulator.yellowCards + row.yellowCards,
+    redCards: accumulator.redCards + row.redCards,
   }), {
-    possession: 0,
+    possessionRaw: 0,
     shots: 0,
     shotsOnTarget: 0,
     saves: 0,
     passes: 0,
     completed: 0,
     interceptions: 0,
+    corners: 0,
     fouls: 0,
     offsides: 0,
+    yellowCards: 0,
+    redCards: 0,
   })
 
   return {
     ...total,
-    possession: Math.round(total.possession / rows.length),
     passAccuracy: total.passes > 0 ? Math.round((total.completed / total.passes) * 100) : 0,
   }
 }
@@ -1095,17 +1179,34 @@ function buildGameHighlights(events) {
 
 function buildShotMap(events) {
   return events
-    .filter((event) => event.x != null && event.y != null)
-    .filter((event) => ['goal', 'save', 'miss', 'yellow-card', 'second_yellow', 'red-card', 'own-goal'].includes(event.type))
-    .map((event) => ({
+    .filter((event) => ['goal', 'save', 'miss', 'own-goal'].includes(event.type))
+    .map((event) => {
+      const coordinates = toShotMapCoordinates(event)
+      if (!coordinates) {
+        return null
+      }
+
+      return {
       id: event.id,
       teamId: event.teamId,
       playerName: event.playerName,
       minute: event.minute,
-      x: event.x,
-      y: event.y,
+      x: coordinates.x,
+      y: coordinates.y,
       type: event.type,
-    }))
+      }
+    })
+    .filter(Boolean)
+}
+
+function buildShotZoneMaps(events) {
+  const homeShots = events.filter((event) => event.side === 'home' && ['goal', 'save', 'miss', 'own-goal'].includes(event.type))
+  const awayShots = events.filter((event) => event.side === 'away' && ['goal', 'save', 'miss', 'own-goal'].includes(event.type))
+
+  return {
+    home: buildShotZoneSummary('home', homeShots),
+    away: buildShotZoneSummary('away', awayShots),
+  }
 }
 
 function buildTournamentStandingsGroups(rawTournament, fixtures) {
@@ -1457,22 +1558,99 @@ function normalizeEventType(value) {
   return normalized
 }
 
-function normalizeCoordinate(normalizedValue, rawValue) {
+function toUnitCoordinate(normalizedValue, rawValue) {
   if (normalizedValue != null) {
     const numeric = Number(normalizedValue)
     if (Number.isFinite(numeric)) {
-      return Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric))
+      return Math.max(0, Math.min(1, numeric <= 1 ? numeric : numeric / 100))
     }
   }
 
   if (rawValue != null) {
     const numeric = Number(rawValue)
     if (Number.isFinite(numeric)) {
-      return Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric))
+      return Math.max(0, Math.min(1, numeric <= 1 ? numeric : numeric / 100))
     }
   }
 
   return null
+}
+
+function isFirstHalfPeriod(period, matchSecond) {
+  const normalized = String(period ?? '').trim().toUpperCase()
+  if (normalized.includes('FIRST')) return true
+  if (normalized.includes('SECOND')) return false
+  return matchSecond > 0 ? matchSecond < 2700 : true
+}
+
+function toTeamPerspectiveCoordinates(event) {
+  if (event.normX == null || event.normY == null) {
+    return null
+  }
+
+  const firstHalf = isFirstHalfPeriod(event.period, event.matchSecond)
+  const attackDepth = event.side === 'home'
+    ? (firstHalf ? event.normY : 1 - event.normY)
+    : (firstHalf ? 1 - event.normY : event.normY)
+
+  return {
+    attackDepth: Math.max(0, Math.min(1, attackDepth)),
+    lateral: Math.max(0, Math.min(1, event.normX)),
+  }
+}
+
+function toShotMapCoordinates(event) {
+  const perspective = toTeamPerspectiveCoordinates(event)
+  if (!perspective) {
+    return null
+  }
+
+  const x = event.side === 'home'
+    ? perspective.attackDepth * 50
+    : 100 - (perspective.attackDepth * 50)
+  const y = perspective.lateral * 100
+
+  return {
+    x: Number(x.toFixed(2)),
+    y: Number(y.toFixed(2)),
+  }
+}
+
+function buildShotZoneSummary(side, shots) {
+  const zoneCounts = new Map()
+  let goals = 0
+
+  shots.forEach((event) => {
+    const perspective = toTeamPerspectiveCoordinates(event)
+    if (!perspective) {
+      return
+    }
+
+    const column = Math.max(0, Math.min(7, Math.floor(perspective.attackDepth * 8)))
+    const row = Math.max(0, Math.min(2, Math.floor(perspective.lateral * 3)))
+    const zoneId = `zone-${(row * 8) + column + 1}`
+    const current = zoneCounts.get(zoneId) ?? { id: zoneId, shots: 0, goals: 0 }
+    current.shots += 1
+    if (event.type === 'goal' || event.type === 'own-goal') {
+      current.goals += 1
+      goals += 1
+    }
+    zoneCounts.set(zoneId, current)
+  })
+
+  const totalShots = shots.length
+  const zones = Array.from(zoneCounts.values()).map((zone) => ({
+    ...zone,
+    percentage: totalShots > 0 ? Math.round((zone.shots / totalShots) * 100) : 0,
+    occupant: side === 'home' ? 'Home attack' : 'Away attack',
+  }))
+
+  return {
+    shots: totalShots,
+    goals,
+    conversion: totalShots > 0 ? Math.round((goals / totalShots) * 100) : 0,
+    zones,
+  }
 }
 
 function abbreviateLabel(value, maxLength = 2) {

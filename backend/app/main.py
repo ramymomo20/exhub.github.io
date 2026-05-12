@@ -60,6 +60,11 @@ PLAYER_STATS_SUBQUERY = """
         SUM(pmd.keeper_saves) AS keeper_saves,
         SUM(pmd.keeper_saves_caught) AS keeper_saves_caught,
         SUM(pmd.goals_conceded) AS goals_conceded,
+        SUM(pmd.free_kicks) AS free_kicks,
+        SUM(pmd.penalties) AS penalties,
+        SUM(pmd.corners) AS corners,
+        SUM(pmd.throw_ins) AS throw_ins,
+        SUM(pmd.goal_kicks) AS goal_kicks,
         SUM(pmd.offsides) AS offsides,
         AVG(pmd.possession) AS possession,
         SUM(pmd.time_played) AS time_played,
@@ -89,16 +94,38 @@ PLAYER_STATS_SUBQUERY = """
 """
 
 CURRENT_PLAYER_TEAM_SUBQUERY = """
-    SELECT latest.steam_id, latest.team_guild_id, latest.guild_team_name
-    FROM hub_match_player_stats latest
-    JOIN (
-        SELECT steam_id, MAX(match_stats_id) AS latest_match_stats_id
-        FROM hub_match_player_stats
-        WHERE team_guild_id IS NOT NULL
-        GROUP BY steam_id
-    ) summary
-        ON summary.steam_id = latest.steam_id
-       AND summary.latest_match_stats_id = latest.match_stats_id
+    SELECT
+        latest.steam_id,
+        latest.resolved_team_guild_id AS team_guild_id,
+        latest.resolved_team_name AS guild_team_name
+    FROM (
+        SELECT
+            pmd.steam_id,
+            COALESCE(
+                NULLIF(pmd.team_guild_id, ''),
+                CASE
+                    WHEN pmd.team_side = 'home' THEN m.home_guild_id
+                    WHEN pmd.team_side = 'away' THEN m.away_guild_id
+                    ELSE NULL
+                END
+            ) AS resolved_team_guild_id,
+            COALESCE(
+                NULLIF(pmd.guild_team_name, ''),
+                CASE
+                    WHEN pmd.team_side = 'home' THEN m.home_team_name
+                    WHEN pmd.team_side = 'away' THEN m.away_team_name
+                    ELSE NULL
+                END
+            ) AS resolved_team_name,
+            ROW_NUMBER() OVER (
+                PARTITION BY pmd.steam_id
+                ORDER BY COALESCE(pmd.source_updated_at, m.source_updated_at, m.match_datetime) DESC, pmd.match_stats_id DESC
+            ) AS row_num
+        FROM hub_match_player_stats pmd
+        LEFT JOIN hub_matches m ON m.match_stats_id = pmd.match_stats_id
+        WHERE pmd.team_guild_id IS NOT NULL OR pmd.team_side IN ('home', 'away')
+    ) latest
+    WHERE latest.row_num = 1
 """
 
 PLAYER_SELECT_FIELDS = """
@@ -140,6 +167,11 @@ PLAYER_SELECT_FIELDS = """
     COALESCE(stats.keeper_saves, 0) AS keeper_saves,
     COALESCE(stats.keeper_saves_caught, 0) AS keeper_saves_caught,
     COALESCE(stats.goals_conceded, 0) AS goals_conceded,
+    COALESCE(stats.free_kicks, 0) AS free_kicks,
+    COALESCE(stats.penalties, 0) AS penalties,
+    COALESCE(stats.corners, 0) AS corners,
+    COALESCE(stats.throw_ins, 0) AS throw_ins,
+    COALESCE(stats.goal_kicks, 0) AS goal_kicks,
     COALESCE(stats.offsides, 0) AS offsides,
     COALESCE(stats.possession, 0) AS possession,
     COALESCE(stats.time_played, 0) AS time_played,

@@ -154,27 +154,30 @@ function buildTeamOfWeekLineup(players, matches) {
     CF: ['CF', 'CM', 'RW', 'LW'],
     RW: ['RW', 'RM', 'LW'],
   }
-  const detailedMatches = matches.filter((match) => Array.isArray(match.performances) && match.performances.length > 0)
-  const latestMatchDate = detailedMatches.reduce((latest, match) => {
+  const latestPlayerActivity = players.reduce((latest, player) => {
+    const parsed = player.lastMatchAt ? new Date(player.lastMatchAt) : null
+    if (!parsed || Number.isNaN(parsed.getTime()) || parsed < latest) {
+      return latest
+    }
+    return parsed
+  }, new Date('2026-05-01T00:00:00'))
+  const latestMatchDate = matches.reduce((latest, match) => {
     const parsed = new Date(match.date)
     return Number.isNaN(parsed.getTime()) || parsed < latest ? latest : parsed
-  }, new Date('2026-05-01T00:00:00'))
+  }, latestPlayerActivity)
   const threshold = new Date(latestMatchDate)
   threshold.setDate(threshold.getDate() - 7)
 
-  const activePlayerIds = new Set(
-    detailedMatches
-      .filter((match) => {
-        const parsed = new Date(match.date)
-        return !Number.isNaN(parsed.getTime()) && parsed >= threshold
-      })
-      .flatMap((match) => match.performances.map((entry) => entry.playerId))
-      .filter(Boolean),
-  )
-
   const activePlayers = players
-    .filter((player) => activePlayerIds.size ? activePlayerIds.has(player.id) : true)
-    .sort((left, right) => right.rating - left.rating)
+    .filter((player) => {
+      const parsed = player.lastMatchAt ? new Date(player.lastMatchAt) : null
+      return !parsed || Number.isNaN(parsed.getTime()) ? true : parsed >= threshold
+    })
+    .sort((left, right) => {
+      const ratingGap = right.rating - left.rating
+      if (ratingGap !== 0) return ratingGap
+      return right.stats.avgRating - left.stats.avgRating
+    })
   const used = new Set()
 
   return slots.map((slot) => {

@@ -136,7 +136,9 @@ export function TeamProfilePage() {
                 <div className="log-card-score">{match.homeScore} : {match.awayScore}</div>
                 <div>
                   <strong>MVP</strong>
-                  {getPlayerById(match.mvpId) ? <PlayerInlineLink playerId={match.mvpId} compact /> : <p>{match.mvpId}</p>}
+                  {match.mvpId && getPlayerById(match.mvpId)
+                    ? <PlayerInlineLink playerId={match.mvpId} compact />
+                    : <p>{match.mvpName || match.mvpId || 'N/A'}</p>}
                 </div>
               </Link>
             ))}

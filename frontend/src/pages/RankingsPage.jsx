@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FormPills, PageIntro, PageTrail, PlayerInlineLink, TeamInlineLink, Widget } from '../components/ui'
 import { listMatches, listPlayers, listTeams } from '../data/repository'
 
@@ -7,10 +7,32 @@ export function RankingsPage() {
   const teams = listTeams()
   const matches = listMatches()
   const [category, setCategory] = useState('overall')
-  const [homeTeamId, setHomeTeamId] = useState('aether-fc')
-  const [awayTeamId, setAwayTeamId] = useState('velora-athletic')
-  const [leftPlayerId, setLeftPlayerId] = useState('naru')
-  const [rightPlayerId, setRightPlayerId] = useState('lyo')
+  const [homeTeamId, setHomeTeamId] = useState('')
+  const [awayTeamId, setAwayTeamId] = useState('')
+  const [leftPlayerId, setLeftPlayerId] = useState('')
+  const [rightPlayerId, setRightPlayerId] = useState('')
+
+  useEffect(() => {
+    if (!teams.length) return
+
+    if (!teams.some((team) => team.id === homeTeamId)) {
+      setHomeTeamId(teams[0]?.id ?? '')
+    }
+    if (!teams.some((team) => team.id === awayTeamId)) {
+      setAwayTeamId(teams[1]?.id ?? teams[0]?.id ?? '')
+    }
+  }, [teams, homeTeamId, awayTeamId])
+
+  useEffect(() => {
+    if (!players.length) return
+
+    if (!players.some((player) => player.id === leftPlayerId)) {
+      setLeftPlayerId(players[0]?.id ?? '')
+    }
+    if (!players.some((player) => player.id === rightPlayerId)) {
+      setRightPlayerId(players[1]?.id ?? players[0]?.id ?? '')
+    }
+  }, [players, leftPlayerId, rightPlayerId])
 
   const playerRows = useMemo(() => {
     const sorted = [...players]
