@@ -195,6 +195,14 @@ async def _mark_sync_state(
         await conn.commit()
 
 
+async def _get_mysql_table_columns(mysql_pool: aiomysql.Pool, table: str) -> set[str]:
+    async with mysql_pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(f"SHOW COLUMNS FROM `{table}`")
+            rows = await cur.fetchall()
+    return {str(row["Field"]) for row in rows}
+
+
 async def _fetch_changed_match_scope_from_match_stats(
     pg_pool: asyncpg.Pool,
     watermark: datetime | None,
@@ -655,6 +663,21 @@ async def sync_match_player_stats(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Po
         scope_ids = sorted({int(row["match_stats_id"]) for row in rows if row.get("match_stats_id") is not None})
         max_scope_updated_at = _max_source_updated_at(rows)
 
+    available_columns = await _get_mysql_table_columns(mysql_pool, "hub_match_player_stats")
+    desired_columns = [
+        "source_player_match_data_id", "match_stats_id", "match_id", "steam_id",
+        "team_guild_id", "team_side", "guild_team_name", "player_name",
+        "position_code", "status", "match_rating", "is_match_mvp", "goals",
+        "assists", "second_assists", "shots", "shots_on_goal", "passes_completed",
+        "passes_attempted", "pass_accuracy", "chances_created", "key_passes",
+        "interceptions", "tackles", "sliding_tackles_completed", "fouls",
+        "fouls_suffered", "yellow_cards", "red_cards", "own_goals",
+        "keeper_saves", "keeper_saves_caught", "goals_conceded", "free_kicks",
+        "penalties", "corners", "throw_ins", "goal_kicks", "offsides",
+        "possession", "time_played", "distance_covered", "source_updated_at",
+    ]
+    insert_columns = [column for column in desired_columns if column in available_columns]
+
     return SyncResult(
         "hub_match_player_stats",
         await _replace_scoped_rows(
@@ -663,18 +686,7 @@ async def sync_match_player_stats(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Po
             "match_stats_id",
             scope_ids,
             rows,
-            [
-                "source_player_match_data_id", "match_stats_id", "match_id", "steam_id",
-                "team_guild_id", "team_side", "guild_team_name", "player_name",
-                "position_code", "status", "match_rating", "is_match_mvp", "goals",
-                "assists", "second_assists", "shots", "shots_on_goal", "passes_completed",
-                "passes_attempted", "pass_accuracy", "chances_created", "key_passes",
-                "interceptions", "tackles", "sliding_tackles_completed", "fouls",
-                "fouls_suffered", "yellow_cards", "red_cards", "own_goals",
-                "keeper_saves", "keeper_saves_caught", "goals_conceded", "free_kicks",
-                "penalties", "corners", "throw_ins", "goal_kicks", "offsides",
-                "possession", "time_played", "distance_covered", "source_updated_at",
-            ],
+            insert_columns,
         ),
         max_scope_updated_at,
     )

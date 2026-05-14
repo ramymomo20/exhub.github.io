@@ -16,8 +16,8 @@ export function HomePage() {
   const featuredPlayer = topThree[0] ?? null
   const topTeam = [...teams].sort((left, right) => left.rank - right.rank || right.avgRating - left.avgRating)[0] ?? null
   const teamOfWeek = useMemo(() => buildTeamOfWeekLineup(players, matches), [players, matches])
-  const activePlayersStat = quickStats.find((stat) => stat.label === 'Active Players')
-  const matchesThisWeekStat = quickStats.find((stat) => stat.label === 'Matches This Week')
+  const totalPlayersStat = quickStats.find((stat) => stat.label === 'Total Players')
+  const matchesLast7DaysStat = quickStats.find((stat) => stat.label === 'Matches Last 7 Days')
 
   useEffect(() => {
     const handle = window.setInterval(() => {
@@ -62,14 +62,15 @@ export function HomePage() {
 
       <section className="quick-stats-grid">
         <article className="card quick-stat">
-          <span>Active Players</span>
-          <strong>{activePlayersStat?.value ?? players.length}</strong>
+          <span>Total Players</span>
+          <strong>{totalPlayersStat?.value ?? players.length}</strong>
+          <small>{totalPlayersStat?.delta}</small>
         </article>
 
         <article className="card quick-stat">
-          <span>Matches This Week</span>
-          <strong>{matchesThisWeekStat?.value ?? matches.length}</strong>
-          <small>{matchesThisWeekStat?.delta}</small>
+          <span>Matches Last 7 Days</span>
+          <strong>{matchesLast7DaysStat?.value ?? matches.length}</strong>
+          <small>{matchesLast7DaysStat?.delta}</small>
         </article>
 
         <article className="card quick-stat quick-stat-rich">

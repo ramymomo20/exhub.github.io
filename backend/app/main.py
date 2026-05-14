@@ -1,22 +1,45 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config
+from . import cache, config
 from .db import create_mysql_pool, mysql_cursor, public_row, public_rows
+
+OPTIONAL_MATCH_PLAYER_STATS_COLUMNS = (
+    "free_kicks",
+    "penalties",
+    "corners",
+    "throw_ins",
+    "goal_kicks",
+)
+
+
+async def _fetch_table_columns(pool, table_name: str) -> set[str]:
+    async with mysql_cursor(pool) as (_, cur):
+        await cur.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        rows = await cur.fetchall()
+    return {str(row["Field"]) for row in rows}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.mysql_pool = await create_mysql_pool()
+    app.state.redis = await cache.create_redis_client()
+    app.state.hub_match_player_stats_columns = await _fetch_table_columns(
+        app.state.mysql_pool,
+        "hub_match_player_stats",
+    )
     try:
         yield
     finally:
+        await cache.close_redis_client(getattr(app.state, "redis", None))
         app.state.mysql_pool.close()
         await app.state.mysql_pool.wait_closed()
 
@@ -32,7 +55,18 @@ app.add_middleware(
 )
 
 
-PLAYER_STATS_SUBQUERY = """
+def build_player_stats_subquery(existing_columns: set[str] | None = None) -> str:
+    existing_columns = existing_columns or set()
+    optional_stat_sql = "\n".join(
+        (
+            f"        SUM(pmd.{column}) AS {column},"
+            if column in existing_columns
+            else f"        0 AS {column},"
+        )
+        for column in OPTIONAL_MATCH_PLAYER_STATS_COLUMNS
+    )
+
+    return f"""
     SELECT
         pmd.steam_id,
         SUM(pmd.goals) AS goals,
@@ -60,11 +94,7 @@ PLAYER_STATS_SUBQUERY = """
         SUM(pmd.keeper_saves) AS keeper_saves,
         SUM(pmd.keeper_saves_caught) AS keeper_saves_caught,
         SUM(pmd.goals_conceded) AS goals_conceded,
-        SUM(pmd.free_kicks) AS free_kicks,
-        SUM(pmd.penalties) AS penalties,
-        SUM(pmd.corners) AS corners,
-        SUM(pmd.throw_ins) AS throw_ins,
-        SUM(pmd.goal_kicks) AS goal_kicks,
+{optional_stat_sql}
         SUM(pmd.offsides) AS offsides,
         AVG(pmd.possession) AS possession,
         SUM(pmd.time_played) AS time_played,
@@ -183,9 +213,10 @@ PLAYER_SELECT_FIELDS = """
     COALESCE(stats.losses, 0) AS losses
 """
 
-PLAYER_SELECT_FROM = f"""
+def build_player_select_from(existing_columns: set[str] | None = None) -> str:
+    return f"""
     FROM hub_players p
-    LEFT JOIN ({PLAYER_STATS_SUBQUERY}) stats ON stats.steam_id = p.steam_id
+    LEFT JOIN ({build_player_stats_subquery(existing_columns)}) stats ON stats.steam_id = p.steam_id
     LEFT JOIN ({CURRENT_PLAYER_TEAM_SUBQUERY}) current_team ON current_team.steam_id = p.steam_id
 """
 
@@ -226,24 +257,70 @@ MATCH_SELECT_FROM = """
 """
 
 
-async def fetch_all(request: Request, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+def _cache_key_from_sql(namespace: str, sql: str, params: tuple[Any, ...]) -> str:
+    normalized_sql = " ".join(sql.split())
+    payload = json.dumps(
+        {
+            "sql": normalized_sql,
+            "params": public_row(list(params)),
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()
+    return f"{config.REDIS_KEY_PREFIX}:{namespace}:{digest}"
+
+
+async def fetch_all(
+    request: Request,
+    sql: str,
+    params: tuple[Any, ...] = (),
+    *,
+    cache_ttl: int | None = None,
+) -> list[dict[str, Any]]:
+    ttl = config.API_CACHE_TTL_SECONDS if cache_ttl is None else cache_ttl
+    redis_client = getattr(request.app.state, "redis", None)
+    cache_key = _cache_key_from_sql("sql:many", sql, params) if redis_client and ttl > 0 else None
+    if cache_key is not None:
+        cached = await cache.get_json(redis_client, cache_key)
+        if isinstance(cached, list):
+            return cached
+
     try:
         async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
             await asyncio.wait_for(
                 cur.execute(sql, params),
                 timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
             )
-            return public_rows(
+            rows = public_rows(
                 await asyncio.wait_for(
                     cur.fetchall(),
                     timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
                 )
             )
+            if cache_key is not None:
+                await cache.set_json(redis_client, cache_key, rows, ttl)
+            return rows
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
 
 
-async def fetch_one(request: Request, sql: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
+async def fetch_one(
+    request: Request,
+    sql: str,
+    params: tuple[Any, ...],
+    *,
+    cache_ttl: int | None = None,
+    cache_namespace: str = "sql:one",
+) -> dict[str, Any] | None:
+    ttl = config.API_CACHE_TTL_SECONDS if cache_ttl is None else cache_ttl
+    redis_client = getattr(request.app.state, "redis", None)
+    cache_key = _cache_key_from_sql(cache_namespace, sql, params) if redis_client and ttl > 0 else None
+    if cache_key is not None:
+        cached = await cache.get_json(redis_client, cache_key)
+        if isinstance(cached, dict):
+            return cached
+
     try:
         async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
             await asyncio.wait_for(
@@ -254,7 +331,10 @@ async def fetch_one(request: Request, sql: str, params: tuple[Any, ...]) -> dict
                 cur.fetchone(),
                 timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
             )
-            return public_row(dict(row)) if row else None
+            value = public_row(dict(row)) if row else None
+            if cache_key is not None and value is not None:
+                await cache.set_json(redis_client, cache_key, value, ttl)
+            return value
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
 
@@ -283,6 +363,9 @@ async def list_players(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
+    player_select_from = build_player_select_from(
+        getattr(request.app.state, "hub_match_player_stats_columns", set()),
+    )
     where = ""
     params: list[Any] = []
     if q.strip():
@@ -295,7 +378,7 @@ async def list_players(
         request,
         f"""
         SELECT {PLAYER_SELECT_FIELDS}
-        {PLAYER_SELECT_FROM}
+        {player_select_from}
         {where}
         ORDER BY p.rating DESC, p.display_name ASC
         LIMIT %s OFFSET %s
@@ -306,11 +389,14 @@ async def list_players(
 
 @app.get("/api/players/{steam_id}")
 async def get_player(request: Request, steam_id: str):
+    player_select_from = build_player_select_from(
+        getattr(request.app.state, "hub_match_player_stats_columns", set()),
+    )
     player = await fetch_one(
         request,
         f"""
         SELECT {PLAYER_SELECT_FIELDS}
-        {PLAYER_SELECT_FROM}
+        {player_select_from}
         WHERE p.steam_id = %s
         """,
         (steam_id,),
@@ -368,6 +454,9 @@ async def list_teams(request: Request, limit: int = Query(100, ge=1, le=250), of
 
 @app.get("/api/teams/{guild_id}")
 async def get_team(request: Request, guild_id: str):
+    player_select_from = build_player_select_from(
+        getattr(request.app.state, "hub_match_player_stats_columns", set()),
+    )
     team = await fetch_one(request, "SELECT * FROM v_hub_team_profile_summary WHERE guild_id = %s", (guild_id,))
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -387,7 +476,7 @@ async def get_team(request: Request, guild_id: str):
         request,
         f"""
         SELECT {PLAYER_SELECT_FIELDS}
-        {PLAYER_SELECT_FROM}
+        {player_select_from}
         WHERE current_team.team_guild_id = %s
         ORDER BY p.rating DESC, p.display_name ASC
         """,
@@ -542,6 +631,43 @@ async def list_media(
         LIMIT %s OFFSET %s
         """,
         tuple(params),
+    )
+
+
+@app.get("/api/summary")
+async def hub_summary(request: Request):
+    return await fetch_one(
+        request,
+        """
+        SELECT
+            (SELECT COUNT(*) FROM hub_players) AS total_players,
+            (
+                SELECT COUNT(DISTINCT pmd.steam_id)
+                FROM hub_match_player_stats pmd
+                JOIN hub_matches m ON m.match_stats_id = pmd.match_stats_id
+                WHERE m.match_datetime >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+            ) AS active_players_last_7_days,
+            (SELECT COUNT(*) FROM hub_teams) AS total_teams,
+            (SELECT COUNT(*) FROM hub_matches) AS total_matches,
+            (
+                SELECT COUNT(*)
+                FROM hub_matches
+                WHERE match_datetime >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+            ) AS matches_last_7_days,
+            (
+                SELECT COUNT(*)
+                FROM hub_media_assets
+                WHERE is_public = TRUE
+            ) AS total_media_assets,
+            (
+                SELECT MAX(last_synced_at)
+                FROM hub_sync_state
+                WHERE sync_key = 'full_sync'
+            ) AS last_full_sync_at
+        """,
+        (),
+        cache_ttl=config.SUMMARY_CACHE_TTL_SECONDS,
+        cache_namespace="summary",
     )
 
 

@@ -33,6 +33,7 @@ function buildInitialState() {
     matches: [],
     tournaments: [],
     media: [],
+    summary: null,
     records: [],
     quickStats: [],
     homeFeatures: [],
@@ -209,7 +210,7 @@ function applyDerivedState(baseState) {
   const players = enrichPlayers(baseState.players, teams)
   const tournaments = enrichTournaments(baseState.tournaments, teams, players)
   const records = buildRecords(players, teams)
-  const quickStats = buildQuickStats(players, teams, baseState.matches, baseState.media)
+  const quickStats = buildQuickStats(players, teams, baseState.matches, baseState.media, baseState.summary)
   const homeFeatures = buildHomeFeatures(baseState.matches, tournaments, teams)
   const discordOverview = buildDiscordOverview(players, teams, baseState.matches, baseState.media)
 
@@ -250,8 +251,9 @@ async function ensureBootstrapLoaded() {
     settleTask(fetchAllPages('/api/matches', DEFAULT_PAGE_SIZE)),
     settleTask(fetchJson(withPagination('/api/tournaments', 100, 0))),
     fetchAllPagesOrDefault('/api/media', [], DEFAULT_PAGE_SIZE),
+    settleTask(fetchJson('/api/summary'), null),
   ])
-    .then(([teamsResult, playersResult, matchesResult, tournamentsResult, rawMedia]) => {
+    .then(([teamsResult, playersResult, matchesResult, tournamentsResult, rawMedia, summaryResult]) => {
       const failedResults = [teamsResult, playersResult, matchesResult, tournamentsResult]
         .filter((result) => result && result.__hubFetchError)
       if (failedResults.length === 4) {
@@ -262,6 +264,7 @@ async function ensureBootstrapLoaded() {
       const rawPlayers = playersResult?.__hubFetchError ? [] : playersResult
       const rawMatches = matchesResult?.__hubFetchError ? [] : matchesResult
       const rawTournaments = tournamentsResult?.__hubFetchError ? [] : tournamentsResult
+      const rawSummary = summaryResult?.__hubFetchError ? null : summaryResult
       const mappedState = applyDerivedState({
         ...state,
         bootstrapStatus: 'loaded',
@@ -271,6 +274,7 @@ async function ensureBootstrapLoaded() {
         matches: rawMatches.map(mapMatchSummary),
         tournaments: rawTournaments.map(mapTournamentSummary),
         media: rawMedia.map(mapMediaItem),
+        summary: rawSummary,
       })
 
       setState(mappedState)
@@ -1305,21 +1309,27 @@ function buildRecords(players, teams) {
   return records
 }
 
-function buildQuickStats(players, teams, matches, media) {
-  const latestMatchDate = matches.map((match) => parseDisplayDate(match.date)).filter(Boolean).sort((left, right) => right - left)[0]
-  const weekThreshold = latestMatchDate ? new Date(latestMatchDate.getTime() - 7 * 24 * 60 * 60 * 1000) : null
-  const weeklyMatches = weekThreshold
-    ? matches.filter((match) => {
-      const parsed = parseDisplayDate(match.date)
-      return parsed && parsed >= weekThreshold
-    }).length
-    : matches.length
+function buildQuickStats(players, teams, matches, media, summary) {
+  const now = Date.now()
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000)
+  const activePlayersLast7Days = summary?.active_players_last_7_days ?? players.filter((player) => {
+    const parsed = parseDisplayDate(player.lastMatchAt)
+    return parsed && parsed >= sevenDaysAgo
+  }).length
+  const matchesLast7Days = summary?.matches_last_7_days ?? matches.filter((match) => {
+    const parsed = parseDisplayDate(match.date)
+    return parsed && parsed >= sevenDaysAgo
+  }).length
+  const totalPlayers = summary?.total_players ?? players.length
+  const totalTeams = summary?.total_teams ?? teams.length
+  const totalMatches = summary?.total_matches ?? matches.length
+  const totalMediaAssets = summary?.total_media_assets ?? media.length
 
   return [
-    { label: 'Active Players', value: String(players.length), delta: `${teams.length} teams mirrored` },
-    { label: 'Matches This Week', value: String(weeklyMatches), delta: `${matches.length} total synced` },
-    { label: 'Media Assets', value: String(media.length), delta: 'Public hub library' },
-    { label: 'Tracked Teams', value: String(teams.length), delta: 'Hub read model' },
+    { label: 'Total Players', value: String(totalPlayers), delta: `${activePlayersLast7Days} active in last 7 days` },
+    { label: 'Matches Last 7 Days', value: String(matchesLast7Days), delta: `${totalMatches} total synced` },
+    { label: 'Media Assets', value: String(totalMediaAssets), delta: 'Public hub library' },
+    { label: 'Tracked Teams', value: String(totalTeams), delta: 'Hub read model' },
   ]
 }
 
