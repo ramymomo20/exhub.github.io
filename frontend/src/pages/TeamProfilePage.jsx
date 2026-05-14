@@ -106,6 +106,7 @@ export function TeamProfilePage() {
               ['Tackles completed', aggregated.tacklesCompleted],
               ['Tackle accuracy', `${aggregated.tackleAccuracy}%`],
               ['Average distance ran', `${aggregated.distanceRan} km`],
+              ['Total distance ran', `${aggregated.totalDistanceRan} km`],
             ]} />
             <TeamStatSection title="Attacking" items={[
               ['Goals', aggregated.goals],
@@ -176,14 +177,18 @@ function buildTeamStatistics(squad) {
     return accumulator
   }, {})
 
-  const playersCount = squad.length || 1
   const appearances = totals.appearances || 1
+  const passesAttempted = totals.apasses ?? 0
+  const savesFaced = (totals.saves ?? 0) + (totals.goalsConceded ?? 0)
+  const tackles = totals.tackles ?? 0
+  const shots = totals.shots ?? 0
+  const totalDistanceRan = totals.totalDistanceRan ?? 0
 
   return {
     assists: totals.assists ?? 0,
-    apasses: totals.apasses ?? 0,
+    apasses: passesAttempted,
     passesCompleted: totals.passesCompleted ?? 0,
-    passAccuracy: Math.round((totals.passAccuracy ?? 0) / playersCount),
+    passAccuracy: passesAttempted > 0 ? Math.round(((totals.passesCompleted ?? 0) / passesAttempted) * 100) : 0,
     keyPasses: totals.keyPasses ?? 0,
     chancesCreated: totals.chancesCreated ?? 0,
     secondAssists: totals.secondAssists ?? 0,
@@ -194,18 +199,19 @@ function buildTeamStatistics(squad) {
     offsides: totals.offsides ?? 0,
     saves: totals.saves ?? 0,
     savesCaught: totals.savesCaught ?? 0,
-    savePercentage: Math.round((totals.savePercentage ?? 0) / playersCount),
+    savePercentage: savesFaced > 0 ? Math.round(((totals.saves ?? 0) / savesFaced) * 100) : 0,
     goalsConceded: totals.goalsConceded ?? 0,
     ownGoals: totals.ownGoals ?? 0,
     interceptions: totals.interceptions ?? 0,
     tackles: totals.tackles ?? 0,
     tacklesCompleted: totals.tacklesCompleted ?? 0,
-    tackleAccuracy: Math.round((totals.tackleAccuracy ?? 0) / playersCount),
-    distanceRan: ((totals.distanceRan ?? 0) / playersCount).toFixed(1),
+    tackleAccuracy: tackles > 0 ? Math.round(((totals.tacklesCompleted ?? 0) / tackles) * 100) : 0,
+    distanceRan: (totalDistanceRan / appearances).toFixed(1),
+    totalDistanceRan: totalDistanceRan.toFixed(1),
     goals: totals.goals ?? 0,
     shots: totals.shots ?? 0,
     shotsOnTarget: totals.shotsOnTarget ?? 0,
-    shotAccuracy: Math.round((totals.shotAccuracy ?? 0) / playersCount),
+    shotAccuracy: shots > 0 ? Math.round(((totals.shotsOnTarget ?? 0) / shots) * 100) : 0,
     goalsPerGame: ((totals.goals ?? 0) / appearances).toFixed(2),
   }
 }

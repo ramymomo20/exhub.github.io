@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable
 
-import aiomysql
 import asyncpg
+
+from . import config
 
 
 PLAYER_MATCH_JOIN_SQL = """
@@ -23,15 +23,6 @@ class SyncResult:
     table: str
     rows: int
     max_source_updated_at: datetime | None = None
-
-
-def _json_text(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, default=str)
-
 
 def _short_name(name: str | None) -> str | None:
     cleaned = " ".join(str(name or "").replace("-", " ").split())
@@ -53,6 +44,24 @@ def _stringify_identifier(value: Any) -> str | None:
 
 
 DISCORD_MENTION_RE = re.compile(r"^<@!?(\d+)>$")
+
+UPSERT_CONFLICT_TARGETS: dict[str, list[str]] = {
+    "hub_players": ["steam_id"],
+    "hub_teams": ["guild_id"],
+    "hub_matches": ["match_stats_id"],
+    "hub_match_lineups": ["match_stats_id", "side", "steam_id"],
+    "hub_match_player_stats": ["source_player_match_data_id"],
+    "hub_match_events": ["source_event_id"],
+    "hub_player_rating_history": ["source_rating_history_id"],
+    "hub_tournaments": ["tournament_id"],
+    "hub_tournament_teams": ["source_id"],
+    "hub_tournament_standings": ["tournament_id", "guild_id"],
+    "hub_tournament_fixtures": ["fixture_id"],
+}
+
+
+def _hub_relation(name: str) -> str:
+    return f'"{config.HUB_POSTGRES_SCHEMA}".{name}'
 
 
 def _normalize_discord_identifier(value: Any) -> str | None:
@@ -98,22 +107,19 @@ def _max_source_updated_at(rows: list[dict[str, Any]], field_name: str = "source
     return max(values) if values else None
 
 
-async def _get_sync_watermark(mysql_pool: aiomysql.Pool, key: str) -> datetime | None:
-    async with mysql_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(
-                "SELECT last_source_updated_at FROM hub_sync_state WHERE sync_key = %s",
-                (key,),
-            )
-            row = await cur.fetchone()
+async def _get_sync_watermark(hub_pool: asyncpg.Pool, key: str) -> datetime | None:
+    row = await hub_pool.fetchrow(
+        f"SELECT last_source_updated_at FROM {_hub_relation('hub_sync_state')} WHERE sync_key = $1",
+        key,
+    )
     if not row:
         return None
-    value = row.get("last_source_updated_at")
+    value = dict(row).get("last_source_updated_at")
     return value if isinstance(value, datetime) else None
 
 
 async def _upsert_rows(
-    mysql_pool: aiomysql.Pool,
+    hub_pool: asyncpg.Pool,
     table: str,
     rows: list[dict[str, Any]],
     columns: list[str],
@@ -123,84 +129,105 @@ async def _upsert_rows(
         return 0
 
     update_columns = update_columns or columns[1:]
-    col_sql = ", ".join(f"`{col}`" for col in columns)
-    placeholders = ", ".join(["%s"] * len(columns))
-    update_sql = ", ".join(f"`{col}` = VALUES(`{col}`)" for col in update_columns)
-    update_sql = f"{update_sql}, `synced_at` = UTC_TIMESTAMP(6)"
-    sql = f"INSERT INTO `{table}` ({col_sql}) VALUES ({placeholders}) ON DUPLICATE KEY UPDATE {update_sql}"
+    conflict_columns = UPSERT_CONFLICT_TARGETS.get(table)
+    if not conflict_columns:
+        raise RuntimeError(f"No upsert conflict target configured for {table}")
+
+    col_sql = ", ".join(f'"{col}"' for col in columns)
+    placeholders = ", ".join(f"${index}" for index in range(1, len(columns) + 1))
+    conflict_sql = ", ".join(f'"{col}"' for col in conflict_columns)
+    update_sql = ", ".join(f'"{col}" = EXCLUDED."{col}"' for col in update_columns)
+    update_sql = f"{update_sql}, \"synced_at\" = NOW()"
+    sql = f"""
+        INSERT INTO {_hub_relation(table)} ({col_sql})
+        VALUES ({placeholders})
+        ON CONFLICT ({conflict_sql})
+        DO UPDATE SET {update_sql}
+    """
     values = [tuple(row.get(col) for col in columns) for row in rows]
 
-    async with mysql_pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.executemany(sql, values)
-        await conn.commit()
+    async with hub_pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.executemany(sql, values)
 
     return len(rows)
 
 
 async def _replace_scoped_rows(
-    mysql_pool: aiomysql.Pool,
+    hub_pool: asyncpg.Pool,
     table: str,
     scope_column: str,
     scope_values: list[Any],
     rows: list[dict[str, Any]],
     columns: list[str],
 ) -> int:
-    async with mysql_pool.acquire() as conn:
-        async with conn.cursor() as cur:
+    async with hub_pool.acquire() as conn:
+        async with conn.transaction():
             if scope_values:
-                placeholders = ", ".join(["%s"] * len(scope_values))
-                await cur.execute(f"DELETE FROM `{table}` WHERE `{scope_column}` IN ({placeholders})", tuple(scope_values))
+                placeholders = ", ".join(f"${index}" for index in range(1, len(scope_values) + 1))
+                await conn.execute(
+                    f'DELETE FROM {_hub_relation(table)} WHERE "{scope_column}" IN ({placeholders})',
+                    *scope_values,
+                )
             if rows:
-                col_sql = ", ".join(f"`{col}`" for col in columns)
-                placeholders = ", ".join(["%s"] * len(columns))
-                await cur.executemany(
-                    f"INSERT INTO `{table}` ({col_sql}) VALUES ({placeholders})",
+                col_sql = ", ".join(f'"{col}"' for col in columns)
+                placeholders = ", ".join(f"${index}" for index in range(1, len(columns) + 1))
+                await conn.executemany(
+                    f"INSERT INTO {_hub_relation(table)} ({col_sql}) VALUES ({placeholders})",
                     [tuple(row.get(col) for col in columns) for row in rows],
                 )
-        await conn.commit()
     return len(rows)
 
 
 async def _mark_sync_state(
-    mysql_pool: aiomysql.Pool,
+    hub_pool: asyncpg.Pool,
     key: str,
     status: str,
     rows: int,
     error: str | None = None,
     source_updated_at: datetime | None = None,
 ) -> None:
-    async with mysql_pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                INSERT INTO hub_sync_state (
-                    sync_key,
-                    last_synced_at,
-                    last_source_updated_at,
-                    rows_synced,
-                    status,
-                    error_message
-                )
-                VALUES (%s, NOW(6), %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    last_synced_at = VALUES(last_synced_at),
-                    last_source_updated_at = COALESCE(VALUES(last_source_updated_at), last_source_updated_at),
-                    rows_synced = VALUES(rows_synced),
-                    status = VALUES(status),
-                    error_message = VALUES(error_message)
-                """,
-                (key, source_updated_at, rows, status, error),
-            )
-        await conn.commit()
+    await hub_pool.execute(
+        f"""
+        INSERT INTO {_hub_relation('hub_sync_state')} (
+            sync_key,
+            last_synced_at,
+            last_source_updated_at,
+            rows_synced,
+            status,
+            error_message,
+            updated_at
+        )
+        VALUES ($1, NOW(), $2, $3, $4, $5, NOW())
+        ON CONFLICT (sync_key)
+        DO UPDATE SET
+            last_synced_at = EXCLUDED.last_synced_at,
+            last_source_updated_at = COALESCE(EXCLUDED.last_source_updated_at, {_hub_relation('hub_sync_state')}.last_source_updated_at),
+            rows_synced = EXCLUDED.rows_synced,
+            status = EXCLUDED.status,
+            error_message = EXCLUDED.error_message,
+            updated_at = NOW()
+        """,
+        key,
+        source_updated_at,
+        rows,
+        status,
+        error,
+    )
 
 
-async def _get_mysql_table_columns(mysql_pool: aiomysql.Pool, table: str) -> set[str]:
-    async with mysql_pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(f"SHOW COLUMNS FROM `{table}`")
-            rows = await cur.fetchall()
-    return {str(row["Field"]) for row in rows}
+async def _get_hub_table_columns(hub_pool: asyncpg.Pool, table: str) -> set[str]:
+    rows = await hub_pool.fetch(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = $2
+        """,
+        config.HUB_POSTGRES_SCHEMA,
+        table,
+    )
+    return {str(row["column_name"]) for row in rows}
 
 
 async def _fetch_changed_match_scope_from_match_stats(
@@ -297,8 +324,8 @@ async def _fetch_changed_match_scope_for_events(
     return scope_ids, _max_source_updated_at(rows, "changed_at")
 
 
-async def sync_players(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_players")
+async def sync_players(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_players")
     params: list[Any] = []
     where_sql = ""
     if watermark is not None:
@@ -334,7 +361,7 @@ async def sync_players(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> Sync
     return SyncResult(
         "hub_players",
         await _upsert_rows(
-            mysql_pool,
+            hub_pool,
             "hub_players",
             rows,
             [
@@ -347,8 +374,8 @@ async def sync_players(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> Sync
     )
 
 
-async def sync_teams(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_teams")
+async def sync_teams(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_teams")
     params: list[Any] = []
     where_sql = ""
     if watermark is not None:
@@ -382,7 +409,7 @@ async def sync_teams(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncRe
     return SyncResult(
         "hub_teams",
         await _upsert_rows(
-            mysql_pool,
+            hub_pool,
             "hub_teams",
             rows,
             [
@@ -395,8 +422,8 @@ async def sync_teams(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncRe
     )
 
 
-async def sync_matches(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_matches")
+async def sync_matches(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_matches")
     params: list[Any] = []
     if watermark is not None:
         params.append(watermark)
@@ -507,7 +534,7 @@ async def sync_matches(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> Sync
     return SyncResult(
         "hub_matches",
         await _upsert_rows(
-            mysql_pool,
+            hub_pool,
             "hub_matches",
             rows,
             [
@@ -522,8 +549,8 @@ async def sync_matches(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> Sync
     )
 
 
-async def sync_match_lineups(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_match_lineups")
+async def sync_match_lineups(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_match_lineups")
     scope_ids, max_scope_updated_at = await _fetch_changed_match_scope_from_match_stats(pg_pool, watermark)
 
     if watermark is not None and not scope_ids:
@@ -571,7 +598,7 @@ async def sync_match_lineups(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -
     return SyncResult(
         "hub_match_lineups",
         await _replace_scoped_rows(
-            mysql_pool,
+            hub_pool,
             "hub_match_lineups",
             "match_stats_id",
             scope_ids,
@@ -585,8 +612,8 @@ async def sync_match_lineups(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -
     )
 
 
-async def sync_match_player_stats(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_match_player_stats")
+async def sync_match_player_stats(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_match_player_stats")
     scope_ids, max_scope_updated_at = await _fetch_changed_match_scope_for_player_stats(pg_pool, watermark)
 
     if watermark is not None and not scope_ids:
@@ -663,7 +690,7 @@ async def sync_match_player_stats(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Po
         scope_ids = sorted({int(row["match_stats_id"]) for row in rows if row.get("match_stats_id") is not None})
         max_scope_updated_at = _max_source_updated_at(rows)
 
-    available_columns = await _get_mysql_table_columns(mysql_pool, "hub_match_player_stats")
+    available_columns = await _get_hub_table_columns(hub_pool, "hub_match_player_stats")
     desired_columns = [
         "source_player_match_data_id", "match_stats_id", "match_id", "steam_id",
         "team_guild_id", "team_side", "guild_team_name", "player_name",
@@ -681,7 +708,7 @@ async def sync_match_player_stats(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Po
     return SyncResult(
         "hub_match_player_stats",
         await _replace_scoped_rows(
-            mysql_pool,
+            hub_pool,
             "hub_match_player_stats",
             "match_stats_id",
             scope_ids,
@@ -692,8 +719,8 @@ async def sync_match_player_stats(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Po
     )
 
 
-async def sync_match_events(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_match_events")
+async def sync_match_events(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_match_events")
     scope_ids, max_scope_updated_at = await _fetch_changed_match_scope_for_events(pg_pool, watermark)
 
     if watermark is not None and not scope_ids:
@@ -733,7 +760,7 @@ async def sync_match_events(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) ->
             me.y,
             me.norm_x,
             me.norm_y,
-            me.raw_event_payload::text AS raw_event_payload,
+            me.raw_event_payload AS raw_event_payload,
             COALESCE(me.created_at, ms.updated_at, ms.datetime) AS source_updated_at
         FROM match_events me
         JOIN match_stats ms ON ms.id = me.match_stats_id
@@ -750,8 +777,6 @@ async def sync_match_events(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) ->
         "player2_steam_id",
         "player3_steam_id",
     )
-    for row in rows:
-        row["raw_event_payload"] = _json_text(row.get("raw_event_payload"))
 
     if watermark is None:
         scope_ids = sorted({int(row["match_stats_id"]) for row in rows if row.get("match_stats_id") is not None})
@@ -760,7 +785,7 @@ async def sync_match_events(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) ->
     return SyncResult(
         "hub_match_events",
         await _replace_scoped_rows(
-            mysql_pool,
+            hub_pool,
             "hub_match_events",
             "match_stats_id",
             scope_ids,
@@ -777,8 +802,8 @@ async def sync_match_events(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) ->
     )
 
 
-async def sync_rating_history(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> SyncResult:
-    watermark = await _get_sync_watermark(mysql_pool, "hub_player_rating_history")
+async def sync_rating_history(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> SyncResult:
+    watermark = await _get_sync_watermark(hub_pool, "hub_player_rating_history")
     params: list[Any] = []
     where_sql = ""
     if watermark is not None:
@@ -817,7 +842,7 @@ async def sync_rating_history(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) 
     return SyncResult(
         "hub_player_rating_history",
         await _upsert_rows(
-            mysql_pool,
+            hub_pool,
             "hub_player_rating_history",
             rows,
             [
@@ -832,7 +857,7 @@ async def sync_rating_history(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) 
     )
 
 
-async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> list[SyncResult]:
+async def sync_tournaments(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> list[SyncResult]:
     tournaments = _rows_as_dicts(await pg_pool.fetch(
         """
         SELECT
@@ -898,6 +923,7 @@ async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> 
             is_draw_away,
             is_forfeit_home,
             is_forfeit_away,
+            forfeit_score,
             played_match_stats_id,
             played_at,
             created_at
@@ -915,7 +941,7 @@ async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> 
         SyncResult(
             "hub_tournaments",
             await _upsert_rows(
-                mysql_pool,
+                hub_pool,
                 "hub_tournaments",
                 tournaments,
                 [
@@ -929,7 +955,7 @@ async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> 
         SyncResult(
             "hub_tournament_teams",
             await _upsert_rows(
-                mysql_pool,
+                hub_pool,
                 "hub_tournament_teams",
                 teams,
                 ["source_id", "tournament_id", "guild_id", "team_name", "team_icon", "league_key", "seed"],
@@ -939,7 +965,7 @@ async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> 
         SyncResult(
             "hub_tournament_standings",
             await _upsert_rows(
-                mysql_pool,
+                hub_pool,
                 "hub_tournament_standings",
                 standings,
                 [
@@ -952,14 +978,14 @@ async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> 
         SyncResult(
             "hub_tournament_fixtures",
             await _upsert_rows(
-                mysql_pool,
+                hub_pool,
                 "hub_tournament_fixtures",
                 fixtures,
                 [
                     "fixture_id", "tournament_id", "league_key", "week_number", "week_label",
                     "home_guild_id", "away_guild_id", "home_name", "away_name", "is_active",
                     "is_played", "is_draw_home", "is_draw_away", "is_forfeit_home",
-                    "is_forfeit_away", "played_match_stats_id", "played_at", "created_at",
+                    "is_forfeit_away", "forfeit_score", "played_match_stats_id", "played_at", "created_at",
                 ],
             ),
             None,
@@ -967,7 +993,7 @@ async def sync_tournaments(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> 
     ]
 
 
-async def sync_all(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> list[SyncResult]:
+async def sync_all(pg_pool: asyncpg.Pool, hub_pool: asyncpg.Pool) -> list[SyncResult]:
     results: list[SyncResult] = []
     try:
         for syncer in (
@@ -979,20 +1005,20 @@ async def sync_all(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> list[Syn
             sync_match_events,
             sync_rating_history,
         ):
-            result = await syncer(pg_pool, mysql_pool)
+            result = await syncer(pg_pool, hub_pool)
             results.append(result)
             await _mark_sync_state(
-                mysql_pool,
+                hub_pool,
                 result.table,
                 "ok",
                 result.rows,
                 source_updated_at=result.max_source_updated_at,
             )
 
-        for result in await sync_tournaments(pg_pool, mysql_pool):
+        for result in await sync_tournaments(pg_pool, hub_pool):
             results.append(result)
             await _mark_sync_state(
-                mysql_pool,
+                hub_pool,
                 result.table,
                 "ok",
                 result.rows,
@@ -1000,7 +1026,7 @@ async def sync_all(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> list[Syn
             )
 
         await _mark_sync_state(
-            mysql_pool,
+            hub_pool,
             "full_sync",
             "ok",
             sum(r.rows for r in results),
@@ -1011,5 +1037,5 @@ async def sync_all(pg_pool: asyncpg.Pool, mysql_pool: aiomysql.Pool) -> list[Syn
         )
         return results
     except Exception as exc:
-        await _mark_sync_state(mysql_pool, "full_sync", "error", sum(r.rows for r in results), str(exc))
+        await _mark_sync_state(hub_pool, "full_sync", "error", sum(r.rows for r in results), str(exc))
         raise

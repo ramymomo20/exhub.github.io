@@ -1,6 +1,6 @@
 Python API and sync layer for the IOSCA Hub.
 
-Postgres/Supabase stays the bot source database. MySQL is the hub read replica so public page traffic does not consume Supabase egress.
+Postgres/Supabase stays the bot source database. The public hub read model now lives in a dedicated Postgres schema, so the API only reads from mirrored `hub` tables instead of operational bot tables.
 
 ## Setup
 
@@ -10,13 +10,13 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Apply the MySQL schema:
+Apply the hub Postgres schema:
 
 ```bash
-python scripts/apply_mysql_schema.py
+python scripts/apply_hub_schema.py
 ```
 
-Run a full sync from Postgres to MySQL:
+Run a full sync from source tables into the hub schema:
 
 ```bash
 python scripts/sync_from_postgres.py
@@ -34,14 +34,12 @@ The backend reads the repo root `.env` by default. Required variables:
 
 ```env
 SUPABASE_DB_URL=postgresql://...
-MYSQL_CONNECTION_STRING=mysql://user:password@host:3306/database
+HUB_POSTGRES_SCHEMA=iosca_hub_production
 ```
-
-You can also use `MYSQL_USERNAME`, `MYSQL_PASSWORD`, `MYSQL_ENDPOINT`, and `MYSQL_DATABASE`.
 
 ## Data Boundary
 
-Keep these in Postgres only:
+Keep these in the source schema only:
 
 - Discord channel config and lineup state
 - active match contexts
@@ -49,7 +47,7 @@ Keep these in Postgres only:
 - import skip bookkeeping
 - moderation/admin-only workflows
 
-Mirror these into MySQL:
+Mirror these into the hub schema:
 
 - public players and ratings
 - public teams
@@ -65,19 +63,20 @@ Convention:
 - Discord-facing IDs (`guild_id`, `discord_id`, captain/user/channel/role style IDs when mirrored) are stored as strings in the hub model.
 - Internal record keys (`match_stats_id`, `tournament_id`, `fixture_id`) stay numeric.
 
-Hub-only features like media metadata, profile overrides, public badges, and editorial content can live in MySQL because the bot does not need them.
+Hub-only features like media metadata, profile overrides, public badges, and editorial content can live in the hub schema because the bot does not need them.
 
-## Reducing Supabase Egress
+## Read Model Strategy
 
-Public hub pages should only call this API/MySQL. The sync script is the only part that reads Supabase for hub data.
+Public hub pages should only call this API and only read `HUB_POSTGRES_SCHEMA`. The sync script is the only part that reads the source tables for hub data.
 
 Recommended production flow:
 
 ```bash
+python scripts/apply_hub_schema.py
 python scripts/sync_from_postgres.py
 ```
 
-Run that every 2-5 minutes from cron, a panel scheduler, or a small worker process. Do not query Supabase from frontend pages or public API request handlers.
+Run the sync every 2-5 minutes from cron, a panel scheduler, or a small worker process. Do not query operational source tables from frontend pages or public API request handlers.
 
 ## Frontend API Base URL
 

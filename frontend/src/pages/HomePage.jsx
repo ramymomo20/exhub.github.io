@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AccentLink, Crest, MatchCard, Pitch, PlayerBadge, PlayerInlineLink, Widget } from '../components/ui'
-import { getTopRatedPlayers, listHomeFeatures, listMatches, listPlayers, listQuickStats, listTeams } from '../data/repository'
+import { getTopRatedPlayers, getTrendingPlayers, listHomeFeatures, listMatches, listPlayers, listQuickStats, listTeams } from '../data/repository'
 
 export function HomePage() {
   const homeFeatures = listHomeFeatures()
@@ -10,6 +10,7 @@ export function HomePage() {
   const matches = listMatches()
   const teams = listTeams()
   const topThree = getTopRatedPlayers(3)
+  const trendingPlayers = getTrendingPlayers(6, 2)
   const featureCount = homeFeatures.length
   const [featureIndex, setFeatureIndex] = useState(0)
   const activeFeature = homeFeatures[featureIndex]
@@ -107,7 +108,7 @@ export function HomePage() {
       <section className="dashboard-grid">
         <Widget title="Trending Players" className="span-two">
           <div className="horizontal-rail">
-            {players.slice(0, 6).map((player) => (
+            {trendingPlayers.map((player) => (
               <PlayerBadge key={player.id} player={player} />
             ))}
           </div>
@@ -172,12 +173,16 @@ function buildTeamOfWeekLineup(players, matches) {
   const activePlayers = players
     .filter((player) => {
       const parsed = player.lastMatchAt ? new Date(player.lastMatchAt) : null
-      return !parsed || Number.isNaN(parsed.getTime()) ? true : parsed >= threshold
+      return (!parsed || Number.isNaN(parsed.getTime()) ? true : parsed >= threshold)
+        && (player.recent?.appearances ?? 0) > 0
     })
     .sort((left, right) => {
-      const ratingGap = right.rating - left.rating
+      const ratingGap = (right.recent?.avgRating ?? 0) - (left.recent?.avgRating ?? 0)
       if (ratingGap !== 0) return ratingGap
-      return right.stats.avgRating - left.stats.avgRating
+      const productionGap = ((right.recent?.goals ?? 0) + (right.recent?.assists ?? 0))
+        - ((left.recent?.goals ?? 0) + (left.recent?.assists ?? 0))
+      if (productionGap !== 0) return productionGap
+      return right.rating - left.rating
     })
   const used = new Set()
 
@@ -195,7 +200,7 @@ function buildTeamOfWeekLineup(players, matches) {
     return {
       playerId: player.id,
       role: slot,
-      rating: Number(player.stats.avgRating?.toFixed ? player.stats.avgRating.toFixed(1) : player.stats.avgRating) || player.rating / 10,
+      rating: Number(player.recent?.avgRating?.toFixed ? player.recent.avgRating.toFixed(1) : player.recent?.avgRating) || player.stats.avgRating || player.rating / 10,
       badges: buildTeamOfWeekBadges(player),
     }
   })
@@ -204,15 +209,15 @@ function buildTeamOfWeekLineup(players, matches) {
 function buildTeamOfWeekBadges(player) {
   const badges = []
 
-  if (player.position === 'GK' && player.stats.saves > 0) {
-    badges.push({ type: 'save', count: Math.min(player.stats.saves, 9) })
+  if (player.position === 'GK' && (player.recent?.saves ?? 0) > 0) {
+    badges.push({ type: 'save', count: Math.min(player.recent?.saves ?? 0, 9) })
   } else {
-    if (player.stats.goals > 0) badges.push({ type: 'goal', count: Math.min(player.stats.goals, 9) })
-    if (player.stats.assists > 0) badges.push({ type: 'assist', count: Math.min(player.stats.assists, 9) })
+    if ((player.recent?.goals ?? 0) > 0) badges.push({ type: 'goal', count: Math.min(player.recent.goals, 9) })
+    if ((player.recent?.assists ?? 0) > 0) badges.push({ type: 'assist', count: Math.min(player.recent.assists, 9) })
   }
 
-  if (player.stats.yellowCards > 0) badges.push({ type: 'yellow-card', count: Math.min(player.stats.yellowCards, 3) })
-  if (player.mvps > 0) badges.push({ type: 'mvp', count: 1 })
+  if ((player.recent?.yellowCards ?? 0) > 0) badges.push({ type: 'yellow-card', count: Math.min(player.recent.yellowCards, 3) })
+  if ((player.recent?.mvps ?? 0) > 0) badges.push({ type: 'mvp', count: 1 })
 
   return badges
 }

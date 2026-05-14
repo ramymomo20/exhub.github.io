@@ -16,6 +16,7 @@ export function TournamentDetailPage() {
   }
 
   const fixtures = getTournamentFixtures(tournament.id)
+  const fixturesByLeague = groupFixturesByLeague(fixtures)
 
   return (
     <div className="page-stack">
@@ -61,7 +62,7 @@ export function TournamentDetailPage() {
                       <td>{index + 1}</td>
                       <td>
                         <div className="standings-team-cell">
-                          <TeamInlineLink teamId={row.teamId} compact />
+                          {row.teamId ? <TeamInlineLink teamId={row.teamId} compact /> : <span>{row.teamName}</span>}
                           <FormPills values={row.form} />
                         </div>
                       </td>
@@ -98,17 +99,22 @@ export function TournamentDetailPage() {
 
         <Widget title="Fixtures" className="span-two">
           <div className="results-stack">
-            {fixtures.map((match) => (
-              <div key={match.id} className="log-card">
-                <div>
-                  <strong>{match.competition}</strong>
-                  <p>{match.date} | {match.time}</p>
-                </div>
-                <div className="log-card-score">{match.homeScore} : {match.awayScore}</div>
-                <div>
-                  <strong>{match.status}</strong>
-                  <p>{match.format}</p>
-                </div>
+            {fixturesByLeague.map((group) => (
+              <div key={group.leagueKey} className="fixture-league-group">
+                <strong>{group.label}</strong>
+                {group.fixtures.map((match) => (
+                  <div key={`${group.leagueKey}-${match.id}-${match.fixtureId}`} className="log-card">
+                    <div>
+                      <strong>{match.homeTeamName} vs {match.awayTeamName}</strong>
+                      <p>{match.date} | {match.time}</p>
+                    </div>
+                    <div className="log-card-score">{match.homeScore} : {match.awayScore}</div>
+                    <div>
+                      <strong>{match.status}</strong>
+                      <p>{[match.format, ...match.flags].filter(Boolean).join(' | ')}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -124,4 +130,21 @@ export function TournamentDetailPage() {
       </section>
     </div>
   )
+}
+
+function groupFixturesByLeague(fixtures) {
+  const groups = new Map()
+
+  fixtures.forEach((fixture) => {
+    const leagueKey = fixture.leagueKey || 'Table'
+    const current = groups.get(leagueKey) ?? {
+      leagueKey,
+      label: leagueKey === 'Table' ? 'Main Schedule' : `League ${leagueKey}`,
+      fixtures: [],
+    }
+    current.fixtures.push(fixture)
+    groups.set(leagueKey, current)
+  })
+
+  return Array.from(groups.values()).sort((left, right) => left.leagueKey.localeCompare(right.leagueKey, undefined, { numeric: true, sensitivity: 'base' }))
 }

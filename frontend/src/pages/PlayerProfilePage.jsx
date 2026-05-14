@@ -49,7 +49,7 @@ export function PlayerProfilePage() {
             <FormPills values={getPlayerForm(matchLogs, player.id)} />
             <a
               className="steam-redirect-badge steam-redirect-badge-wide"
-              href={`https://steamcommunity.com/id/${player.id}`}
+              href={`https://steamcommunity.com/profiles/${player.id}`}
               target="_blank"
               rel="noreferrer"
               aria-label="Open Steam profile"
@@ -150,6 +150,7 @@ export function PlayerProfilePage() {
               ['Tackles completed', player.stats.tacklesCompleted],
               ['Tackle accuracy', `${player.stats.tackleAccuracy}%`],
               ['Average distance ran', `${player.stats.distanceRan} km`],
+              ['Total distance ran', `${player.stats.totalDistanceRan} km`],
             ]} />
             <StatSection title="Attacking" items={[
               ['Goals', player.stats.goals],

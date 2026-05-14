@@ -258,6 +258,7 @@ CREATE TABLE IF NOT EXISTS hub_tournament_fixtures (
     is_draw_away BOOLEAN NOT NULL DEFAULT FALSE,
     is_forfeit_home BOOLEAN NOT NULL DEFAULT FALSE,
     is_forfeit_away BOOLEAN NOT NULL DEFAULT FALSE,
+    forfeit_score INT NOT NULL DEFAULT 10,
     played_match_stats_id INT NULL,
     played_at DATETIME NULL,
     created_at DATETIME NULL,

@@ -591,6 +591,22 @@ export function getTopRatedPlayers(limit = 3) {
   return [...state.players].sort((left, right) => right.rating - left.rating).slice(0, limit)
 }
 
+export function getTrendingPlayers(limit = 6, minimumAppearances = 2) {
+  return [...state.players]
+    .filter((player) => toNumber(player.recent?.appearances) >= minimumAppearances)
+    .sort((left, right) => {
+      const recentRatingGap = toNumber(right.recent?.avgRating) - toNumber(left.recent?.avgRating)
+      if (recentRatingGap !== 0) return recentRatingGap
+      const outputGap = (toNumber(right.recent?.goals) + toNumber(right.recent?.assists))
+        - (toNumber(left.recent?.goals) + toNumber(left.recent?.assists))
+      if (outputGap !== 0) return outputGap
+      const mvpGap = toNumber(right.recent?.mvps) - toNumber(left.recent?.mvps)
+      if (mvpGap !== 0) return mvpGap
+      return right.rating - left.rating
+    })
+    .slice(0, limit)
+}
+
 export function getPlayerPerformance(matchId, playerId) {
   const match = getMatchById(matchId)
   const direct = match?.performances?.find((entry) => entry.playerId === playerId)
@@ -649,6 +665,8 @@ function mapPlayerSummary(raw) {
   const saves = toNumber(raw.keeper_saves)
   const goalsConceded = toNumber(raw.goals_conceded)
   const goals = toNumber(raw.goals)
+  const distanceCovered = toKilometers(raw.distance_covered)
+  const recentAppearances = toNumber(raw.recent_appearances)
   const playerName = raw.display_name || raw.steam_id
 
   return {
@@ -662,6 +680,17 @@ function mapPlayerSummary(raw) {
     appearances,
     mvps: toNumber(raw.mvp_awards),
     lastMatchAt: raw.last_match_at ?? null,
+    recent: {
+      appearances: recentAppearances,
+      goals: toNumber(raw.recent_goals),
+      assists: toNumber(raw.recent_assists),
+      yellowCards: toNumber(raw.recent_yellow_cards),
+      saves: toNumber(raw.recent_saves),
+      mvps: toNumber(raw.recent_mvp_awards),
+      avgRating: Number(toNumber(raw.recent_avg_match_rating).toFixed(1)),
+      totalDistanceRan: Number(toKilometers(raw.recent_distance_covered).toFixed(1)),
+      distanceRan: recentAppearances > 0 ? Number((toKilometers(raw.recent_distance_covered) / recentAppearances).toFixed(1)) : 0,
+    },
     stats: {
       appearances,
       subAppearances: 0,
@@ -696,7 +725,8 @@ function mapPlayerSummary(raw) {
       tackles,
       tacklesCompleted: slidingTacklesCompleted,
       tackleAccuracy: tackles > 0 ? Math.round((slidingTacklesCompleted / tackles) * 100) : 0,
-      distanceRan: Number(toNumber(raw.distance_covered).toFixed(1)),
+      distanceRan: appearances > 0 ? Number((distanceCovered / appearances).toFixed(1)) : 0,
+      totalDistanceRan: Number(distanceCovered.toFixed(1)),
       shots,
       shotsOnTarget,
       shotAccuracy: shots > 0 ? Math.round((shotsOnTarget / shots) * 100) : 0,
@@ -899,7 +929,7 @@ function mapPerformance(raw) {
     possessions: Number(toNumber(raw.possession).toFixed(1)),
     saves: toNumber(raw.keeper_saves),
     offsides: toNumber(raw.offsides),
-    distance: `${Number(toNumber(raw.distance_covered).toFixed(2))}km`,
+    distance: `${Number(toKilometers(raw.distance_covered).toFixed(2))}km`,
     fouls: toNumber(raw.fouls),
     foulsSuffered: toNumber(raw.fouls_suffered),
     ownGoals: toNumber(raw.own_goals),
@@ -940,10 +970,7 @@ function mapEvent(raw, namesByPlayer) {
 }
 
 function enrichTeams(teams, matches) {
-  const sorted = [...teams].sort((left, right) => right.avgRating - left.avgRating || right.wins - left.wins || left.name.localeCompare(right.name))
-  const rankById = new Map(sorted.map((team, index) => [team.id, index + 1]))
-
-  return teams.map((team) => {
+  const enriched = teams.map((team) => {
     const teamMatches = matches
       .filter((match) => match.homeTeamId === team.id || match.awayTeamId === team.id)
       .sort(compareMatchDates)
@@ -955,6 +982,14 @@ function enrichTeams(teams, matches) {
       competition: deriveTeamCompetition(team, teamMatches),
     }
   })
+
+  const sorted = enriched.slice().sort(compareTeamsForRanking)
+  const rankById = new Map(sorted.map((team, index) => [team.id, index + 1]))
+
+  return sorted.map((team) => ({
+    ...team,
+    rank: rankById.get(team.id) ?? 0,
+  }))
 }
 
 function enrichPlayers(players, teams) {
@@ -994,7 +1029,7 @@ function buildDetailedLineups(rawLineups, statsByPlayer, groupedEvents) {
       playerId,
       player: entry.player_name ?? playerId ?? 'Player',
       role: normalizePosition(entry.position_code),
-      rating: statLine?.rating ?? 0,
+      rating: typeof statLine?.rating === 'number' ? statLine.rating : null,
       badges: buildBadgeSummary(statLine, eventSummary),
       started: Boolean(entry.started),
       slotOrder: toNumber(entry.slot_order),
@@ -1214,24 +1249,39 @@ function buildShotZoneMaps(events) {
 }
 
 function buildTournamentStandingsGroups(rawTournament, fixtures) {
+  const teamLeagueById = new Map(
+    (rawTournament.teams ?? [])
+      .map((entry) => [entry.guild_id != null ? String(entry.guild_id) : null, normalizeTournamentLeagueKey(entry.league_key)])
+      .filter(([teamId]) => teamId)
+  )
   const fixturesByLeague = groupBy(fixtures, (fixture) => fixture.leagueKey || 'Table')
-  const standingsByLeague = groupBy(rawTournament.standings ?? [], (row) => row.league_key || 'Table')
+  const standingsByLeague = groupBy(
+    rawTournament.standings ?? [],
+    (row) => teamLeagueById.get(row.guild_id != null ? String(row.guild_id) : '') || normalizeTournamentLeagueKey(row.league_key)
+  )
 
-  return Object.entries(standingsByLeague).map(([leagueKey, rows]) => ({
-    name: leagueKey === 'Table' ? 'Main Table' : `Group ${leagueKey}`,
-    rows: rows.map((row) => ({
-      teamId: row.guild_id ? String(row.guild_id) : null,
-      played: toNumber(row.matches_played),
-      wins: toNumber(row.wins),
-      draws: toNumber(row.draws),
-      losses: toNumber(row.losses),
-      goalsFor: toNumber(row.goals_for),
-      goalsAgainst: toNumber(row.goals_against),
-      gd: toNumber(row.goal_diff),
-      points: toNumber(row.points),
-      form: buildTournamentForm(row.guild_id ? String(row.guild_id) : null, fixturesByLeague[leagueKey] ?? []),
-    })),
-  }))
+  return Object.entries(standingsByLeague)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey, undefined, { numeric: true, sensitivity: 'base' }))
+    .map(([leagueKey, rows]) => ({
+      name: formatTournamentLeagueLabel(leagueKey),
+      leagueKey,
+      rows: rows
+        .slice()
+        .sort(compareTournamentStandingsRows)
+        .map((row) => ({
+          teamId: row.guild_id ? String(row.guild_id) : null,
+          teamName: row.team_name ?? 'Unknown Team',
+          played: toNumber(row.matches_played),
+          wins: toNumber(row.wins),
+          draws: toNumber(row.draws),
+          losses: toNumber(row.losses),
+          goalsFor: toNumber(row.goals_for),
+          goalsAgainst: toNumber(row.goals_against),
+          gd: toNumber(row.goal_diff),
+          points: toNumber(row.points),
+          form: buildTournamentForm(row.guild_id ? String(row.guild_id) : null, fixturesByLeague[leagueKey] ?? []),
+        })),
+    }))
 }
 
 function buildTournamentForm(teamId, fixtures) {
@@ -1246,24 +1296,37 @@ function buildTournamentForm(teamId, fixtures) {
 }
 
 function mapTournamentFixture(rawFixture, tournament) {
-  const played = rawFixture.played_match_stats_id != null
+  const leagueKey = normalizeTournamentLeagueKey(rawFixture.league_key)
+  const played = isTournamentFixtureFinal(rawFixture)
   const matchDate = rawFixture.played_match_datetime || rawFixture.played_at || rawFixture.created_at
+  const homeTeamName = rawFixture.played_home_team_name || rawFixture.home_name || 'Home Team'
+  const awayTeamName = rawFixture.played_away_team_name || rawFixture.away_name || 'Away Team'
+  const homeScore = resolveTournamentFixtureScore(rawFixture, 'home')
+  const awayScore = resolveTournamentFixtureScore(rawFixture, 'away')
+  const homeResult = resolveTournamentFixtureSideResult(rawFixture, 'home', homeScore, awayScore)
+  const awayResult = resolveTournamentFixtureSideResult(rawFixture, 'away', homeScore, awayScore)
+  const status = describeTournamentFixtureStatus(rawFixture, homeTeamName, awayTeamName)
+  const flags = buildTournamentFixtureFlags(rawFixture)
 
   return {
     id: String(rawFixture.played_match_stats_id ?? rawFixture.fixture_id),
     fixtureId: toNumber(rawFixture.fixture_id),
     homeTeamId: rawFixture.home_guild_id ? String(rawFixture.home_guild_id) : null,
     awayTeamId: rawFixture.away_guild_id ? String(rawFixture.away_guild_id) : null,
-    homeScore: played ? toNumber(rawFixture.played_home_score) : 0,
-    awayScore: played ? toNumber(rawFixture.played_away_score) : 0,
-    status: played ? 'Final' : (rawFixture.is_active ? 'Scheduled' : 'Pending'),
-    flags: [],
+    homeTeamName,
+    awayTeamName,
+    homeScore,
+    awayScore,
+    homeResult,
+    awayResult,
+    status,
+    flags,
     competition: tournament.name,
     competitionType: inferCompetitionType(tournament.prestige),
     format: played ? formatGameType(rawFixture.played_game_type) : tournament.prestige,
     date: formatLongDate(matchDate),
     time: formatTime(matchDate),
-    leagueKey: rawFixture.league_key || 'Table',
+    leagueKey,
     weekNumber: rawFixture.week_number ?? null,
   }
 }
@@ -1297,7 +1360,7 @@ function buildRecords(players, teams) {
   const topInterceptions = players.slice().sort((left, right) => right.stats.interceptions - left.stats.interceptions)[0]
   const topSaves = players.filter((player) => player.position === 'GK').sort((left, right) => right.stats.saves - left.stats.saves)[0]
   const topPlayer = players.slice().sort((left, right) => right.rating - left.rating)[0]
-  const topTeam = teams.slice().sort((left, right) => right.avgRating - left.avgRating)[0]
+  const topTeam = teams.slice().sort(compareTeamsForRanking)[0]
 
   if (topGoals) records.push({ label: 'Most Goals', holder: topGoals.name, value: topGoals.stats.goals, context: 'Across synced official hub matches' })
   if (topAssists) records.push({ label: 'Most Assists', holder: topAssists.name, value: topAssists.stats.assists, context: 'Across synced official hub matches' })
@@ -1422,6 +1485,9 @@ function buildForm(teamId, matches) {
 }
 
 function resultForTeam(teamId, match) {
+  if (match.homeResult && match.awayResult) {
+    return match.homeTeamId === teamId ? match.homeResult : match.awayResult
+  }
   const isHome = match.homeTeamId === teamId
   const goalsFor = isHome ? match.homeScore : match.awayScore
   const goalsAgainst = isHome ? match.awayScore : match.homeScore
@@ -1616,14 +1682,126 @@ function toShotMapCoordinates(event) {
   }
 
   const x = event.side === 'home'
-    ? perspective.attackDepth * 50
-    : 100 - (perspective.attackDepth * 50)
+    ? 50 - (perspective.attackDepth * 50)
+    : 50 + (perspective.attackDepth * 50)
   const y = perspective.lateral * 100
 
   return {
     x: Number(x.toFixed(2)),
     y: Number(y.toFixed(2)),
   }
+}
+
+function teamRankingPenalty(team) {
+  const noPlayers = toNumber(team.playerCount) <= 0
+  const noGames = toNumber(team.appearances) <= 0
+
+  if (noPlayers && noGames) return 2
+  if (noPlayers || noGames) return 1
+  return 0
+}
+
+function compareTeamsForRanking(left, right) {
+  return teamRankingPenalty(left) - teamRankingPenalty(right)
+    || right.avgRating - left.avgRating
+    || right.wins - left.wins
+    || right.appearances - left.appearances
+    || right.playerCount - left.playerCount
+    || left.name.localeCompare(right.name)
+}
+
+function normalizeTournamentLeagueKey(value) {
+  const text = String(value ?? '').trim()
+  return text || 'Table'
+}
+
+function formatTournamentLeagueLabel(leagueKey) {
+  return leagueKey === 'Table' ? 'Main Table' : `League ${leagueKey}`
+}
+
+function compareTournamentStandingsRows(left, right) {
+  return toNumber(right.points) - toNumber(left.points)
+    || toNumber(right.goal_diff) - toNumber(left.goal_diff)
+    || toNumber(right.goals_for) - toNumber(left.goals_for)
+    || String(left.team_name ?? '').localeCompare(String(right.team_name ?? ''))
+}
+
+function isTournamentFixtureFinal(rawFixture) {
+  return rawFixture.played_match_stats_id != null
+    || Boolean(rawFixture.is_played)
+    || Boolean(rawFixture.is_forfeit_home)
+    || Boolean(rawFixture.is_forfeit_away)
+    || Boolean(rawFixture.is_draw_home)
+    || Boolean(rawFixture.is_draw_away)
+}
+
+function resolveTournamentFixtureScore(rawFixture, side) {
+  if (rawFixture.played_match_stats_id != null) {
+    return side === 'home' ? toNumber(rawFixture.played_home_score) : toNumber(rawFixture.played_away_score)
+  }
+
+  const forfeitScore = Math.max(0, toNumber(rawFixture.forfeit_score) || 0)
+  if (rawFixture.is_forfeit_home) {
+    return side === 'home' ? 0 : forfeitScore
+  }
+  if (rawFixture.is_forfeit_away) {
+    return side === 'home' ? forfeitScore : 0
+  }
+  return 0
+}
+
+function resolveTournamentFixtureSideResult(rawFixture, side, homeScore, awayScore) {
+  if (rawFixture.is_forfeit_home) {
+    return side === 'home' ? 'L' : 'W'
+  }
+  if (rawFixture.is_forfeit_away) {
+    return side === 'home' ? 'W' : 'L'
+  }
+  if (rawFixture.is_draw_home || rawFixture.is_draw_away) {
+    return 'D'
+  }
+  if (!isTournamentFixtureFinal(rawFixture)) {
+    return null
+  }
+  if (homeScore > awayScore) {
+    return side === 'home' ? 'W' : 'L'
+  }
+  if (homeScore < awayScore) {
+    return side === 'home' ? 'L' : 'W'
+  }
+  return 'D'
+}
+
+function describeTournamentFixtureStatus(rawFixture, homeTeamName, awayTeamName) {
+  if (rawFixture.is_forfeit_home) {
+    return `${awayTeamName} won by forfeit`
+  }
+  if (rawFixture.is_forfeit_away) {
+    return `${homeTeamName} won by forfeit`
+  }
+  if (rawFixture.is_draw_home || rawFixture.is_draw_away) {
+    return 'Draw by ruling'
+  }
+  if (rawFixture.played_match_stats_id != null || rawFixture.is_played) {
+    return 'Final'
+  }
+  return rawFixture.is_active ? 'Scheduled' : 'Pending'
+}
+
+function buildTournamentFixtureFlags(rawFixture) {
+  const flags = []
+
+  if (rawFixture.is_forfeit_home || rawFixture.is_forfeit_away) {
+    flags.push('Forfeit')
+  }
+  if (rawFixture.is_draw_home || rawFixture.is_draw_away) {
+    flags.push('Admin draw')
+  }
+  if (rawFixture.is_played && rawFixture.played_match_stats_id == null && !flags.length) {
+    flags.push('Recorded result')
+  }
+
+  return flags
 }
 
 function buildShotZoneSummary(side, shots) {
@@ -1706,6 +1884,11 @@ function toTitleCase(value) {
 function toNumber(value) {
   const numeric = Number(value ?? 0)
   return Number.isFinite(numeric) ? numeric : 0
+}
+
+function toKilometers(value) {
+  const numeric = toNumber(value)
+  return numeric > 50 ? numeric / 1000 : numeric
 }
 
 function groupBy(items, selector) {

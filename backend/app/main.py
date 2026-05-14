@@ -4,13 +4,14 @@ import asyncio
 import hashlib
 import json
 from contextlib import asynccontextmanager
+import re
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import cache, config
-from .db import create_mysql_pool, mysql_cursor, public_row, public_rows
+from .db import create_hub_postgres_pool, public_row, public_rows
 
 OPTIONAL_MATCH_PLAYER_STATS_COLUMNS = (
     "free_kicks",
@@ -22,26 +23,32 @@ OPTIONAL_MATCH_PLAYER_STATS_COLUMNS = (
 
 
 async def _fetch_table_columns(pool, table_name: str) -> set[str]:
-    async with mysql_cursor(pool) as (_, cur):
-        await cur.execute(f"SHOW COLUMNS FROM `{table_name}`")
-        rows = await cur.fetchall()
-    return {str(row["Field"]) for row in rows}
+    rows = await pool.fetch(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = $2
+        """,
+        config.HUB_POSTGRES_SCHEMA,
+        table_name,
+    )
+    return {str(row["column_name"]) for row in rows}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.mysql_pool = await create_mysql_pool()
+    app.state.hub_pool = await create_hub_postgres_pool()
     app.state.redis = await cache.create_redis_client()
     app.state.hub_match_player_stats_columns = await _fetch_table_columns(
-        app.state.mysql_pool,
+        app.state.hub_pool,
         "hub_match_player_stats",
     )
     try:
         yield
     finally:
         await cache.close_redis_client(getattr(app.state, "redis", None))
-        app.state.mysql_pool.close()
-        await app.state.mysql_pool.wait_closed()
+        await app.state.hub_pool.close()
 
 
 app = FastAPI(title=config.API_TITLE, version=config.API_VERSION, lifespan=lifespan)
@@ -57,6 +64,7 @@ app.add_middleware(
 
 def build_player_stats_subquery(existing_columns: set[str] | None = None) -> str:
     existing_columns = existing_columns or set()
+    recent_window_sql = "m.match_datetime >= NOW() - INTERVAL '7 days'"
     optional_stat_sql = "\n".join(
         (
             f"        SUM(pmd.{column}) AS {column},"
@@ -78,7 +86,7 @@ def build_player_stats_subquery(existing_columns: set[str] | None = None) -> str
         SUM(pmd.passes_attempted) AS passes_attempted,
         CASE
             WHEN SUM(pmd.passes_attempted) > 0
-                THEN ROUND((SUM(pmd.passes_completed) / SUM(pmd.passes_attempted)) * 100, 2)
+                THEN ROUND((SUM(pmd.passes_completed)::numeric / SUM(pmd.passes_attempted)::numeric) * 100, 2)
             ELSE 0
         END AS pass_accuracy,
         SUM(pmd.chances_created) AS chances_created,
@@ -101,6 +109,14 @@ def build_player_stats_subquery(existing_columns: set[str] | None = None) -> str
         SUM(pmd.distance_covered) AS distance_covered,
         AVG(pmd.match_rating) AS avg_match_rating,
         SUM(CASE WHEN pmd.is_match_mvp THEN 1 ELSE 0 END) AS mvp_awards,
+        SUM(CASE WHEN {recent_window_sql} THEN 1 ELSE 0 END) AS recent_appearances,
+        SUM(CASE WHEN {recent_window_sql} THEN pmd.goals ELSE 0 END) AS recent_goals,
+        SUM(CASE WHEN {recent_window_sql} THEN pmd.assists ELSE 0 END) AS recent_assists,
+        SUM(CASE WHEN {recent_window_sql} THEN pmd.yellow_cards ELSE 0 END) AS recent_yellow_cards,
+        SUM(CASE WHEN {recent_window_sql} THEN pmd.keeper_saves ELSE 0 END) AS recent_saves,
+        SUM(CASE WHEN {recent_window_sql} THEN pmd.distance_covered ELSE 0 END) AS recent_distance_covered,
+        SUM(CASE WHEN {recent_window_sql} AND pmd.is_match_mvp THEN 1 ELSE 0 END) AS recent_mvp_awards,
+        AVG(CASE WHEN {recent_window_sql} THEN pmd.match_rating END) AS recent_avg_match_rating,
         SUM(
             CASE
                 WHEN (pmd.team_side = 'home' AND m.home_score > m.away_score)
@@ -208,6 +224,14 @@ PLAYER_SELECT_FIELDS = """
     COALESCE(stats.distance_covered, 0) AS distance_covered,
     COALESCE(stats.avg_match_rating, 0) AS avg_match_rating,
     COALESCE(stats.mvp_awards, 0) AS mvp_awards,
+    COALESCE(stats.recent_appearances, 0) AS recent_appearances,
+    COALESCE(stats.recent_goals, 0) AS recent_goals,
+    COALESCE(stats.recent_assists, 0) AS recent_assists,
+    COALESCE(stats.recent_yellow_cards, 0) AS recent_yellow_cards,
+    COALESCE(stats.recent_saves, 0) AS recent_saves,
+    COALESCE(stats.recent_distance_covered, 0) AS recent_distance_covered,
+    COALESCE(stats.recent_mvp_awards, 0) AS recent_mvp_awards,
+    COALESCE(stats.recent_avg_match_rating, 0) AS recent_avg_match_rating,
     COALESCE(stats.wins, 0) AS wins,
     COALESCE(stats.draws, 0) AS draws,
     COALESCE(stats.losses, 0) AS losses
@@ -257,6 +281,51 @@ MATCH_SELECT_FROM = """
 """
 
 
+PLACEHOLDER_RE = re.compile(r"%s")
+HUB_RELATIONS = (
+    "v_hub_tournament_standings_enriched",
+    "v_hub_team_profile_summary",
+    "v_hub_match_overview",
+    "v_hub_player_totals",
+    "hub_player_rating_history",
+    "hub_match_player_stats",
+    "hub_tournament_standings",
+    "hub_tournament_fixtures",
+    "hub_tournament_teams",
+    "hub_match_lineups",
+    "hub_media_assets",
+    "hub_profile_overrides",
+    "hub_sync_state",
+    "hub_tournaments",
+    "hub_matches",
+    "hub_events",
+    "hub_teams",
+    "hub_players",
+)
+
+
+def _to_postgres_sql(sql: str) -> str:
+    counter = 0
+
+    def replace(_: re.Match[str]) -> str:
+        nonlocal counter
+        counter += 1
+        return f"${counter}"
+
+    return PLACEHOLDER_RE.sub(replace, sql)
+
+
+def _qualify_hub_sql(sql: str) -> str:
+    qualified = sql
+    for relation in HUB_RELATIONS:
+        qualified = re.sub(
+            rf"(?<![\w\.\"])({relation})(?![\w\"])",
+            f'"{config.HUB_POSTGRES_SCHEMA}".{relation}',
+            qualified,
+        )
+    return qualified
+
+
 def _cache_key_from_sql(namespace: str, sql: str, params: tuple[Any, ...]) -> str:
     normalized_sql = " ".join(sql.split())
     payload = json.dumps(
@@ -287,20 +356,14 @@ async def fetch_all(
             return cached
 
     try:
-        async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
-            await asyncio.wait_for(
-                cur.execute(sql, params),
-                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
-            )
-            rows = public_rows(
-                await asyncio.wait_for(
-                    cur.fetchall(),
-                    timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
-                )
-            )
-            if cache_key is not None:
-                await cache.set_json(redis_client, cache_key, rows, ttl)
-            return rows
+        rows = await asyncio.wait_for(
+            request.app.state.hub_pool.fetch(_to_postgres_sql(_qualify_hub_sql(sql)), *params),
+            timeout=config.HUB_DB_QUERY_TIMEOUT_SECONDS,
+        )
+        values = public_rows([dict(row) for row in rows])
+        if cache_key is not None:
+            await cache.set_json(redis_client, cache_key, values, ttl)
+        return values
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
 
@@ -322,19 +385,14 @@ async def fetch_one(
             return cached
 
     try:
-        async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
-            await asyncio.wait_for(
-                cur.execute(sql, params),
-                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
-            )
-            row = await asyncio.wait_for(
-                cur.fetchone(),
-                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
-            )
-            value = public_row(dict(row)) if row else None
-            if cache_key is not None and value is not None:
-                await cache.set_json(redis_client, cache_key, value, ttl)
-            return value
+        row = await asyncio.wait_for(
+            request.app.state.hub_pool.fetchrow(_to_postgres_sql(_qualify_hub_sql(sql)), *params),
+            timeout=config.HUB_DB_QUERY_TIMEOUT_SECONDS,
+        )
+        value = public_row(dict(row)) if row else None
+        if cache_key is not None and value is not None:
+            await cache.set_json(redis_client, cache_key, value, ttl)
+        return value
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
 
@@ -342,18 +400,13 @@ async def fetch_one(
 @app.get("/health")
 async def health(request: Request):
     try:
-        async with mysql_cursor(request.app.state.mysql_pool) as (_, cur):
-            await asyncio.wait_for(
-                cur.execute("SELECT 1 AS ok"),
-                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
-            )
-            row = await asyncio.wait_for(
-                cur.fetchone(),
-                timeout=config.MYSQL_QUERY_TIMEOUT_SECONDS,
-            )
+        value = await asyncio.wait_for(
+            request.app.state.hub_pool.fetchval("SELECT 1"),
+            timeout=config.HUB_DB_QUERY_TIMEOUT_SECONDS,
+        )
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Hub database query timed out") from exc
-    return {"ok": bool(row and row.get("ok") == 1)}
+    return {"ok": bool(value == 1)}
 
 
 @app.get("/api/players")
@@ -645,14 +698,14 @@ async def hub_summary(request: Request):
                 SELECT COUNT(DISTINCT pmd.steam_id)
                 FROM hub_match_player_stats pmd
                 JOIN hub_matches m ON m.match_stats_id = pmd.match_stats_id
-                WHERE m.match_datetime >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+                WHERE m.match_datetime >= NOW() - INTERVAL '7 days'
             ) AS active_players_last_7_days,
             (SELECT COUNT(*) FROM hub_teams) AS total_teams,
             (SELECT COUNT(*) FROM hub_matches) AS total_matches,
             (
                 SELECT COUNT(*)
                 FROM hub_matches
-                WHERE match_datetime >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+                WHERE match_datetime >= NOW() - INTERVAL '7 days'
             ) AS matches_last_7_days,
             (
                 SELECT COUNT(*)

@@ -15,7 +15,7 @@ export function TeamsPage() {
       if (ratingFilter === 'below-75') return team.avgRating < 75
       return true
     })
-    .sort((left, right) => right.avgRating - left.avgRating)
+    .sort((left, right) => left.rank - right.rank || right.avgRating - left.avgRating)
 
   return (
     <div className="page-stack">

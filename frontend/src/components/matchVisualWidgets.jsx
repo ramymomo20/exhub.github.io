@@ -155,11 +155,12 @@ export function TeamLineupPitch({ team, players, score, format, mode }) {
 export function PlayerMarker({ player, mode, teamColors }) {
   const bottomBadges = mode === 'stats' ? buildBottomMarkerEvents(player.events, player.position) : []
   const tooltipClass = player.isMvp ? ' player-marker-tooltip-mvp' : ''
+  const hasRating = typeof player.rating === 'number' && Number.isFinite(player.rating)
 
   return (
     <div className={`player-marker${mode === 'titles' ? ' is-title-view' : ''}${player.isMvp ? ' is-mvp' : ''}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>
       <div className="player-marker-visual">
-        <span className={`rating-badge ${getRatingBadgeClass(player.rating, player.isMvp)}`}>{player.rating.toFixed(1)}</span>
+        {hasRating ? <span className={`rating-badge ${getRatingBadgeClass(player.rating, player.isMvp)}`}>{player.rating.toFixed(1)}</span> : null}
         {player.isMvp ? (
           <span className="player-mvp-medal-badge" title="MVP">
             <EventIcon type="mvp" />
@@ -502,37 +503,45 @@ function PitchLines({ orientation, mini = false }) {
 }
 
 function buildLineupPlayers(lineup = [], format, tooltipLookup = {}) {
-  const slots = FORMATION_COORDS[format] ?? FORMATION_COORDS['5v5']
-  const normalized = lineup.map((entry) => ({ ...entry, position: normalizeRole(entry.role) }))
+  const slots = FORMATION_COORDS[String(format ?? '').trim().toLowerCase()] ?? FORMATION_COORDS['5v5']
+  const normalized = lineup
+    .slice()
+    .sort((left, right) => Number(Boolean(right.started)) - Number(Boolean(left.started)) || (left.slotOrder ?? 0) - (right.slotOrder ?? 0))
+    .map((entry) => ({ ...entry, position: normalizeRole(entry.role) }))
   const used = new Set()
+  const mapped = []
 
-  return slots.map((slot, slotIndex) => {
+  slots.forEach((slot, slotIndex) => {
     const directIndex = normalized.findIndex((entry, entryIndex) => !used.has(entryIndex) && entry.position === slot.position)
     const fallbackIndex = directIndex >= 0 ? directIndex : normalized.findIndex((_, entryIndex) => !used.has(entryIndex))
     const source = fallbackIndex >= 0 ? normalized[fallbackIndex] : null
 
-    if (fallbackIndex >= 0) {
-      used.add(fallbackIndex)
+    if (!source) {
+      return
     }
 
-    const player = source?.playerId ? getPlayerById(source.playerId) : null
-    const name = player?.name ?? source?.player ?? `Starter ${slotIndex + 1}`
-    const id = source?.playerId ?? `${slot.position}-${slotIndex}`
-    const badges = source?.badges ?? []
+    used.add(fallbackIndex)
 
-    return {
+    const player = source.playerId ? getPlayerById(source.playerId) : null
+    const name = player?.name ?? source.player ?? `Starter ${slotIndex + 1}`
+    const id = source.playerId ?? `${slot.position}-${slotIndex}`
+    const badges = source.badges ?? []
+
+    mapped.push({
       id,
-      playerId: source?.playerId ?? null,
+      playerId: source.playerId ?? null,
       name,
       position: slot.position,
-      rating: typeof source?.rating === 'number' ? source.rating : 0,
+      rating: typeof source.rating === 'number' ? source.rating : null,
       x: slot.x,
       y: slot.y,
       isMvp: badges.some((badge) => badge.type === 'mvp'),
       events: badgesToEvents(badges),
-      tooltipLines: source?.playerId ? (tooltipLookup[source.playerId] ?? []) : [],
-    }
+      tooltipLines: source.playerId ? (tooltipLookup[source.playerId] ?? []) : [],
+    })
   })
+
+  return mapped
 }
 
 function badgesToEvents(badges = []) {
@@ -588,6 +597,7 @@ function normalizeRole(role) {
 
 function getRatingBadgeClass(rating, isMvp = false) {
   if (isMvp) return 'rating-mvp'
+  if (typeof rating !== 'number' || !Number.isFinite(rating)) return 'rating-grey'
   if (rating < 6) return 'rating-low'
   if (rating < 7.2) return 'rating-grey'
   if (rating < 7.8) return 'rating-green'

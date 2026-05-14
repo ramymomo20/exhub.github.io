@@ -9,19 +9,18 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.db import create_mysql_pool, create_postgres_pool  # noqa: E402
+from app.db import create_hub_postgres_pool, create_postgres_pool  # noqa: E402
 from app.sync import sync_all  # noqa: E402
 
 
 async def main() -> None:
     pg_pool = await create_postgres_pool()
-    mysql_pool = await create_mysql_pool()
+    hub_pool = await create_hub_postgres_pool()
     try:
-        results = await sync_all(pg_pool, mysql_pool)
+        results = await sync_all(pg_pool, hub_pool)
     finally:
         await pg_pool.close()
-        mysql_pool.close()
-        await mysql_pool.wait_closed()
+        await hub_pool.close()
 
     total = 0
     for result in results:

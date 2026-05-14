@@ -123,7 +123,7 @@ export function RankingsPage() {
 
         <Widget title="Team Rankings">
           <div className="ranking-stack">
-            {[...teams].sort((a, b) => b.avgRating - a.avgRating).map((team, index) => (
+            {[...teams].sort((left, right) => left.rank - right.rank || right.avgRating - left.avgRating).map((team, index) => (
               <article key={team.id} className="ranking-item ranking-item-rich">
                 <strong>#{index + 1}</strong>
                 <div className="ranking-team-block">
