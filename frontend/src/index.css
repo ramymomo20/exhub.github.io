@@ -1752,7 +1752,9 @@ th { color: var(--text-faint); font-weight: 600; }
 
 .activity-map-scroll {
   overflow-x: auto;
-  padding-bottom: 8px;
+  overflow-y: visible;
+  padding: 10px 6px 18px;
+  padding-bottom: 18px;
 }
 
 .activity-map-year {
@@ -1782,7 +1784,7 @@ th { color: var(--text-faint); font-weight: 600; }
 .activity-cell-button:focus-visible {
   transform: translateY(-2px) scale(1.08);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
-  z-index: 2;
+  z-index: 6;
 }
 
 .activity-cell-tooltip {
@@ -1800,12 +1802,39 @@ th { color: var(--text-faint); font-weight: 600; }
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 8;
 }
 
 .activity-cell-button:hover .activity-cell-tooltip,
 .activity-cell-button:focus-visible .activity-cell-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.activity-cell-button.tooltip-right .activity-cell-tooltip {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.activity-cell-button.tooltip-right:hover .activity-cell-tooltip,
+.activity-cell-button.tooltip-right:focus-visible .activity-cell-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.activity-cell-button.tooltip-left .activity-cell-tooltip {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.activity-cell-button.tooltip-left:hover .activity-cell-tooltip,
+.activity-cell-button.tooltip-left:focus-visible .activity-cell-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.activity-cell-button.tooltip-down .activity-cell-tooltip {
+  top: calc(100% + 8px);
+  bottom: auto;
 }
 
 .activity-cell.level-1 { background: rgba(87, 216, 255, 0.12); }
@@ -2341,6 +2370,11 @@ th { color: var(--text-faint); font-weight: 600; }
   z-index: 3;
 }
 
+.player-marker:hover,
+.player-marker:focus-within {
+  z-index: 12;
+}
+
 .player-marker-visual {
   position: relative;
   width: 74px;
@@ -2506,6 +2540,22 @@ th { color: var(--text-faint); font-weight: 600; }
   visibility: visible;
 }
 
+.player-marker.hover-left .player-marker-tooltip {
+  left: 0;
+  transform: translateX(0);
+}
+
+.player-marker.hover-right .player-marker-tooltip {
+  left: auto;
+  right: 0;
+  transform: translateX(0);
+}
+
+.player-marker.hover-up .player-marker-tooltip {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
 .player-marker-tooltip strong {
   font-size: 0.84rem;
 }
@@ -2555,6 +2605,11 @@ th { color: var(--text-faint); font-weight: 600; }
   width: 22px;
   height: 22px;
   z-index: 3;
+}
+
+.shot-map-icon:hover,
+.shot-map-icon:focus-within {
+  z-index: 12;
 }
 
 .shot-map-icon .event-icon {
@@ -3113,6 +3168,8 @@ th { color: var(--text-faint); font-weight: 600; }
   grid-template-columns: 32px auto;
   gap: 10px;
   align-items: start;
+  position: relative;
+  overflow: visible;
 }
 
 .activity-map-axis-side {
@@ -3814,6 +3871,32 @@ th { color: var(--text-faint); font-weight: 600; }
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
+}
+
+.shot-map-icon.hover-left .shot-map-tooltip {
+  left: 0;
+  transform: translateX(0) translateY(8px);
+}
+
+.shot-map-icon.hover-left:hover .shot-map-tooltip,
+.shot-map-icon.hover-left:focus-within .shot-map-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.shot-map-icon.hover-right .shot-map-tooltip {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(8px);
+}
+
+.shot-map-icon.hover-right:hover .shot-map-tooltip,
+.shot-map-icon.hover-right:focus-within .shot-map-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.shot-map-icon.hover-down .shot-map-tooltip {
+  top: calc(100% + 8px);
+  bottom: auto;
 }
 
 .shot-map-tooltip strong {

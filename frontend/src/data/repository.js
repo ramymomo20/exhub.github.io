@@ -743,6 +743,7 @@ function mapPlayerSummary(raw) {
 
   return {
     id: String(raw.steam_id),
+    discordId: raw.discord_id != null ? String(raw.discord_id) : null,
     name: playerName,
     teamId: raw.current_team_guild_id ? String(raw.current_team_guild_id) : null,
     teamName: raw.current_team_name ?? null,
@@ -1829,9 +1830,12 @@ function toShotMapCoordinates(event) {
     return null
   }
 
+  const displayDepth = event.type === 'save'
+    ? 1 - perspective.attackDepth
+    : perspective.attackDepth
   const x = event.side === 'home'
-    ? 50 - (perspective.attackDepth * 50)
-    : 50 + (perspective.attackDepth * 50)
+    ? 50 - (displayDepth * 50)
+    : 50 + (displayDepth * 50)
   const y = perspective.lateral * 100
 
   return {

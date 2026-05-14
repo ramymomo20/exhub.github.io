@@ -249,7 +249,7 @@ function ActivityMap({ values }) {
             {cells.map((cell) => (
               <button
                 key={cell.date}
-                className={`activity-cell activity-cell-button level-${cell.level}`}
+                className={`activity-cell activity-cell-button level-${cell.level}${cell.tooltipClass ? ` ${cell.tooltipClass}` : ''}`}
                 type="button"
                 title={`${cell.label}: ${cell.value} matches played`}
                 aria-label={`${cell.label}: ${cell.value} matches`}
@@ -265,7 +265,25 @@ function ActivityMap({ values }) {
 }
 
 function buildActivityCells(values) {
-  return Array.isArray(values) && values.length ? values : []
+  if (!Array.isArray(values) || !values.length) {
+    return []
+  }
+
+  const totalColumns = Math.max(1, Math.ceil(values.length / 7))
+  return values.map((entry, index) => {
+    const rowIndex = index % 7
+    const columnIndex = Math.floor(index / 7)
+    const tooltipClasses = []
+
+    if (columnIndex <= 1) tooltipClasses.push('tooltip-right')
+    if (columnIndex >= totalColumns - 2) tooltipClasses.push('tooltip-left')
+    if (rowIndex <= 1) tooltipClasses.push('tooltip-down')
+
+    return {
+      ...entry,
+      tooltipClass: tooltipClasses.join(' '),
+    }
+  })
 }
 
 function RatingTrendChart({ values }) {

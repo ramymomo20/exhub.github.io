@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getPlayerById, getTeamById, getTeamName } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
@@ -142,10 +143,34 @@ export function PlayerBadge({ player, compact = false }) {
 }
 
 export function PlayerAvatar({ player, className = '' }) {
-  if (player?.avatarUrl) {
+  const sources = useMemo(() => {
+    const values = []
+    if (player?.avatarUrl) {
+      values.push(player.avatarUrl)
+    }
+    if (player?.discordId) {
+      values.push(`https://unavatar.io/discord/${player.discordId}`)
+    }
+    return values
+  }, [player?.avatarUrl, player?.discordId])
+  const [sourceIndex, setSourceIndex] = useState(0)
+
+  useEffect(() => {
+    setSourceIndex(0)
+  }, [sources])
+
+  if (sources[sourceIndex]) {
     return (
       <span className={`${className} has-image`.trim()}>
-        <img src={player.avatarUrl} alt="" loading="lazy" />
+        <img
+          src={sources[sourceIndex]}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            setSourceIndex((current) => (current + 1 < sources.length ? current + 1 : sources.length))
+          }}
+        />
       </span>
     )
   }

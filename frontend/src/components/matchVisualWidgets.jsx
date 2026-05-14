@@ -156,9 +156,14 @@ export function PlayerMarker({ player, mode, teamColors }) {
   const bottomBadges = mode === 'stats' ? buildBottomMarkerEvents(player.events, player.position) : []
   const tooltipClass = player.isMvp ? ' player-marker-tooltip-mvp' : ''
   const hasRating = typeof player.rating === 'number' && Number.isFinite(player.rating)
+  const hoverClass = getFloatingHoverClass(player.x, player.y, {
+    leftThreshold: 18,
+    rightThreshold: 82,
+    bottomThreshold: 62,
+  })
 
   return (
-    <div className={`player-marker${mode === 'titles' ? ' is-title-view' : ''}${player.isMvp ? ' is-mvp' : ''}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>
+    <div className={`player-marker${mode === 'titles' ? ' is-title-view' : ''}${player.isMvp ? ' is-mvp' : ''}${hoverClass ? ` ${hoverClass}` : ''}`} style={{ left: `${player.x}%`, top: `${player.y}%` }}>
       <div className="player-marker-visual">
         {hasRating ? <span className={`rating-badge ${getRatingBadgeClass(player.rating, player.isMvp)}`}>{player.rating.toFixed(1)}</span> : null}
         {player.isMvp ? (
@@ -251,9 +256,15 @@ export function ShotMapWidget({ match, homeTeam, awayTeam }) {
 }
 
 export function ShotMapIcon({ shot, teamName }) {
+  const hoverClass = getFloatingHoverClass(shot.x, shot.y, {
+    leftThreshold: 12,
+    rightThreshold: 88,
+    topThreshold: 16,
+  })
+
   return (
     <div
-      className={`shot-map-icon shot-type-${shot.type}`}
+      className={`shot-map-icon shot-type-${shot.type}${hoverClass ? ` ${hoverClass}` : ''}`}
       style={{ left: `${shot.x}%`, top: `${shot.y}%` }}
     >
       <EventIcon type={shot.type} />
@@ -574,6 +585,31 @@ function buildBottomMarkerEvents(events, position) {
   ]
 
   return [...primary, ...disciplinary].filter(Boolean)
+}
+
+function getFloatingHoverClass(
+  x,
+  y,
+  {
+    leftThreshold = 16,
+    rightThreshold = 84,
+    topThreshold = null,
+    bottomThreshold = null,
+  } = {},
+) {
+  const classes = []
+
+  if (typeof x === 'number' && Number.isFinite(x)) {
+    if (x <= leftThreshold) classes.push('hover-left')
+    if (x >= rightThreshold) classes.push('hover-right')
+  }
+
+  if (typeof y === 'number' && Number.isFinite(y)) {
+    if (topThreshold != null && y <= topThreshold) classes.push('hover-down')
+    if (bottomThreshold != null && y >= bottomThreshold) classes.push('hover-up')
+  }
+
+  return classes.join(' ')
 }
 
 function toEventBadgeData(kind, events) {
