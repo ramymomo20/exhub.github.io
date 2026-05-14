@@ -288,6 +288,7 @@ HUB_RELATIONS = (
     "v_hub_match_overview",
     "v_hub_player_totals",
     "hub_player_rating_history",
+    "hub_match_events",
     "hub_match_player_stats",
     "hub_tournament_standings",
     "hub_tournament_fixtures",
@@ -298,7 +299,6 @@ HUB_RELATIONS = (
     "hub_sync_state",
     "hub_tournaments",
     "hub_matches",
-    "hub_events",
     "hub_teams",
     "hub_players",
 )

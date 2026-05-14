@@ -977,7 +977,7 @@ function enrichTeams(teams, matches) {
 
     return {
       ...team,
-      rank: rankById.get(team.id) ?? 0,
+      rank: 0,
       form: buildForm(team.id, teamMatches),
       competition: deriveTeamCompetition(team, teamMatches),
     }
