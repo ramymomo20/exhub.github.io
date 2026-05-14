@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { FormPills, PageTrail, StatChip, TeamInlineLink, Widget } from '../components/ui'
+import { FormPills, PageTrail, PlayerAvatar, StatChip, TeamInlineLink, Widget } from '../components/ui'
 import { getPlayerById, getPlayerPerformance, listPlayerMatchLogs, useHubPlayerDetail } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
@@ -38,7 +38,7 @@ export function PlayerProfilePage() {
               <span className="profile-big-badge profile-position-badge">{player.position}</span>
             </div>
           </div>
-          <div className={`profile-portrait profile-portrait-rated ${getRatingToneClass(player.rating)}`}>{player.portrait}</div>
+          <PlayerAvatar player={player} className={`profile-portrait profile-portrait-rated ${getRatingToneClass(player.rating)}`} />
         </div>
 
         <div className="profile-center">
@@ -247,12 +247,15 @@ function ActivityMap({ values }) {
           </div>
           <div className="activity-map-year">
             {cells.map((cell) => (
-              <span
+              <button
                 key={cell.date}
-                className={`activity-cell level-${cell.level}`}
-                title={`${cell.label}: ${cell.value} matches`}
+                className={`activity-cell activity-cell-button level-${cell.level}`}
+                type="button"
+                title={`${cell.label}: ${cell.value} matches played`}
                 aria-label={`${cell.label}: ${cell.value} matches`}
-              />
+              >
+                <span className="activity-cell-tooltip">{cell.label} | {cell.value} matches</span>
+              </button>
             ))}
           </div>
         </div>
@@ -262,49 +265,42 @@ function ActivityMap({ values }) {
 }
 
 function buildActivityCells(values) {
-  const base = Array.isArray(values) && values.length ? values : [0]
-  const start = new Date('2026-01-01T00:00:00')
-
-  return Array.from({ length: 365 }, (_, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() + index)
-    const value = base[index % base.length]
-
-    return {
-      date: date.toISOString().slice(0, 10),
-      label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      value,
-      level: Math.min(Math.max(value, 0), 5),
-    }
-  })
+  return Array.isArray(values) && values.length ? values : []
 }
 
 function RatingTrendChart({ values }) {
   const width = 420
   const height = 180
-  const minRating = 5.8
-  const maxRating = 10
+  const minRating = Math.max(0, Math.floor((Math.min(...values.map((entry) => entry.rating), 6) - 0.3) * 10) / 10)
+  const maxRating = Math.min(10, Math.ceil((Math.max(...values.map((entry) => entry.rating), 10) + 0.3) * 10) / 10)
+  const ratingRange = Math.max(0.1, maxRating - minRating)
   const stepX = width / Math.max(1, values.length - 1)
   const points = values.map((entry, index) => {
     const x = index * stepX
-    const y = height - ((entry.rating - minRating) / (maxRating - minRating)) * height
+    const y = height - ((entry.rating - minRating) / ratingRange) * height
     return `${x},${y}`
   }).join(' ')
+  const yTicks = Array.from({ length: 5 }, (_, index) => Number((minRating + (((maxRating - minRating) / 4) * index)).toFixed(1))).reverse()
 
   return (
     <div className="rating-trend-chart">
-      <svg viewBox={`0 0 ${width} ${height}`} className="rating-trend-svg" aria-hidden="true">
-        {[6, 7, 8, 9, 10].map((tick) => {
-          const y = height - ((tick - minRating) / (maxRating - minRating)) * height
+      <div className="rating-trend-shell">
+        <div className="rating-trend-y-axis">
+          {yTicks.map((tick) => <span key={tick}>{tick.toFixed(1)}</span>)}
+        </div>
+        <svg viewBox={`0 0 ${width} ${height}`} className="rating-trend-svg" aria-hidden="true">
+          {yTicks.map((tick) => {
+          const y = height - ((tick - minRating) / ratingRange) * height
           return <line key={tick} x1="0" y1={y} x2={width} y2={y} className="rating-grid-line" />
         })}
         <polyline points={points} className="rating-trend-line" />
         {values.map((entry, index) => {
           const x = index * stepX
-          const y = height - ((entry.rating - minRating) / (maxRating - minRating)) * height
+          const y = height - ((entry.rating - minRating) / ratingRange) * height
           return <circle key={entry.date} cx={x} cy={y} r="4" className="rating-trend-point" />
         })}
-      </svg>
+        </svg>
+      </div>
       <div className="rating-trend-axis">
         {values.map((entry) => <span key={entry.date}>{entry.label}</span>)}
       </div>
@@ -313,12 +309,20 @@ function RatingTrendChart({ values }) {
 }
 
 function buildRatingHistory(player) {
-  const values = player.activity?.slice(0, 6) ?? [2, 3, 4, 3, 5, 4]
-  const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-  return labels.map((label, index) => ({
-    label,
-    date: label,
-    rating: Math.max(6, Math.min(9.9, Number((player.stats.avgRating - 0.7 + (values[index] ?? 0) * 0.18).toFixed(1)))),
+  const logs = (player.matchLogs ?? [])
+    .filter((match) => match.performances?.[0]?.rating != null)
+    .slice()
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
+    .slice(-8)
+
+  if (!logs.length) {
+    return [{ label: 'No data', date: 'no-data', rating: player.stats.avgRating || player.rating }]
+  }
+
+  return logs.map((match) => ({
+    label: new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    date: match.date,
+    rating: match.performances[0].rating,
   }))
 }
 

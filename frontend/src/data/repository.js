@@ -10,6 +10,7 @@ const MAX_PAGINATION_PAGES = 50
 let bootstrapPromise = null
 const playerDetailPromises = new Map()
 const matchDetailPromises = new Map()
+const teamDetailPromises = new Map()
 const tournamentDetailPromises = new Map()
 
 let state = buildInitialState()
@@ -21,11 +22,13 @@ function buildInitialState() {
     detailStatus: {
       players: {},
       matches: {},
+      teams: {},
       tournaments: {},
     },
     detailErrors: {
       players: {},
       matches: {},
+      teams: {},
       tournaments: {},
     },
     teams: [],
@@ -387,6 +390,52 @@ async function ensureMatchDetailLoaded(matchId) {
   return promise
 }
 
+async function ensureTeamDetailLoaded(teamId) {
+  if (!teamId) return null
+  if (state.teamIndex.get(teamId)?.isDetailed) {
+    return state.teamIndex.get(teamId)
+  }
+  if (teamDetailPromises.has(teamId)) {
+    return teamDetailPromises.get(teamId)
+  }
+
+  setDetailStatus('teams', teamId, 'loading')
+
+  const promise = fetchJson(`/api/teams/${encodeURIComponent(teamId)}`)
+    .then((rawTeam) => {
+      const detailedTeam = mapTeamDetail(rawTeam, state.teamIndex.get(teamId))
+      setState((current) => applyDerivedState({
+        ...current,
+        teams: replaceById(current.teams, detailedTeam),
+        detailStatus: {
+          ...current.detailStatus,
+          teams: {
+            ...current.detailStatus.teams,
+            [teamId]: 'loaded',
+          },
+        },
+        detailErrors: {
+          ...current.detailErrors,
+          teams: {
+            ...current.detailErrors.teams,
+            [teamId]: null,
+          },
+        },
+      }))
+      return detailedTeam
+    })
+    .catch((error) => {
+      setDetailError('teams', teamId, error)
+      throw error
+    })
+    .finally(() => {
+      teamDetailPromises.delete(teamId)
+    })
+
+  teamDetailPromises.set(teamId, promise)
+  return promise
+}
+
 async function ensureTournamentDetailLoaded(tournamentId) {
   if (!tournamentId) return null
   if (state.tournamentIndex.get(tournamentId)?.isDetailed) {
@@ -536,6 +585,29 @@ export function useHubMatchDetail(matchId) {
   }
 }
 
+export function useHubTeamDetail(teamId) {
+  const snapshot = useRepositorySnapshot()
+
+  useEffect(() => {
+    if (!teamId) return
+    if (snapshot.bootstrapStatus === 'idle') {
+      void ensureBootstrapLoaded()
+    }
+  }, [teamId, snapshot.bootstrapStatus])
+
+  useEffect(() => {
+    if (!teamId || snapshot.bootstrapStatus !== 'loaded') return
+    if (!snapshot.teamIndex.get(teamId)?.isDetailed) {
+      void ensureTeamDetailLoaded(teamId)
+    }
+  }, [teamId, snapshot.bootstrapStatus, snapshot.teamIndex])
+
+  return {
+    loading: snapshot.bootstrapStatus !== 'loaded' || snapshot.detailStatus.teams[teamId] === 'loading',
+    error: snapshot.detailErrors.teams[teamId] ?? null,
+  }
+}
+
 export function useHubTournamentDetail(tournamentId) {
   const snapshot = useRepositorySnapshot()
 
@@ -674,6 +746,7 @@ function mapPlayerSummary(raw) {
     name: playerName,
     teamId: raw.current_team_guild_id ? String(raw.current_team_guild_id) : null,
     teamName: raw.current_team_name ?? null,
+    avatarUrl: raw.avatar_url ?? null,
     rating: toNumber(raw.rating),
     position: normalizePosition(raw.primary_position, raw),
     portrait: abbreviateLabel(playerName, 2),
@@ -759,6 +832,20 @@ function mapPlayerDetail(rawPlayer, currentPlayer) {
     activity,
     records,
     tournamentSummary: null,
+    isDetailed: true,
+  }
+}
+
+function mapTeamDetail(rawTeam, currentTeam) {
+  const baseTeam = {
+    ...(currentTeam ?? mapTeamSummary(rawTeam)),
+    ...mapTeamSummary(rawTeam),
+  }
+
+  return {
+    ...baseTeam,
+    recentMatches: (rawTeam.recent_matches ?? []).map(mapMatchSummary),
+    aggregateStats: mapTeamAggregateStats(rawTeam.aggregate_player_stats),
     isDetailed: true,
   }
 }
@@ -884,6 +971,52 @@ function mapMediaItem(raw) {
     accent: mediaAccentForGroup(group),
     uploader: 'Community',
     assetUrl: raw.public_url ?? '#',
+  }
+}
+
+function mapTeamAggregateStats(raw) {
+  if (!raw) {
+    return null
+  }
+
+  const appearances = Math.max(1, toNumber(raw.appearances))
+  const passesAttempted = toNumber(raw.passes_attempted)
+  const shots = toNumber(raw.shots)
+  const tackles = toNumber(raw.tackles)
+  const savesFaced = toNumber(raw.keeper_saves) + toNumber(raw.goals_conceded)
+  const totalDistanceRan = toKilometers(raw.distance_covered)
+
+  return {
+    appearances,
+    assists: toNumber(raw.assists),
+    apasses: passesAttempted,
+    passesCompleted: toNumber(raw.passes_completed),
+    passAccuracy: passesAttempted > 0 ? Math.round((toNumber(raw.passes_completed) / passesAttempted) * 100) : 0,
+    keyPasses: toNumber(raw.key_passes),
+    chancesCreated: toNumber(raw.chances_created),
+    secondAssists: toNumber(raw.second_assists),
+    fouls: toNumber(raw.fouls),
+    foulsSuffered: toNumber(raw.fouls_suffered),
+    yellowCards: toNumber(raw.yellow_cards),
+    redCards: toNumber(raw.red_cards),
+    offsides: toNumber(raw.offsides),
+    saves: toNumber(raw.keeper_saves),
+    savesCaught: toNumber(raw.keeper_saves_caught),
+    savePercentage: savesFaced > 0 ? Math.round((toNumber(raw.keeper_saves) / savesFaced) * 100) : 0,
+    goalsConceded: toNumber(raw.goals_conceded),
+    ownGoals: toNumber(raw.own_goals),
+    interceptions: toNumber(raw.interceptions),
+    tackles,
+    tacklesCompleted: toNumber(raw.sliding_tackles_completed),
+    tackleAccuracy: tackles > 0 ? Math.round((toNumber(raw.sliding_tackles_completed) / tackles) * 100) : 0,
+    distanceRan: Number((totalDistanceRan / appearances).toFixed(1)),
+    totalDistanceRan: Number(totalDistanceRan.toFixed(1)),
+    goals: toNumber(raw.goals),
+    shots,
+    shotsOnTarget: toNumber(raw.shots_on_goal),
+    shotAccuracy: shots > 0 ? Math.round((toNumber(raw.shots_on_goal) / shots) * 100) : 0,
+    goalsPerGame: Number((toNumber(raw.goals) / appearances).toFixed(2)),
+    avgRating: Number(toNumber(raw.avg_match_rating).toFixed(1)),
   }
 }
 
@@ -1438,16 +1571,31 @@ function buildDiscordOverview(players, teams, matches, media) {
 }
 
 function buildPlayerActivity(matchLogs) {
-  const monthly = Array.from({ length: 24 }, () => 0)
+  const countsByDate = new Map()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
   matchLogs.forEach((match) => {
     const parsed = parseDisplayDate(match.date)
     if (!parsed) return
-    const monthIndex = parsed.getMonth()
-    monthly[monthIndex % 24] += 1
+    parsed.setHours(0, 0, 0, 0)
+    const key = parsed.toISOString().slice(0, 10)
+    countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1)
   })
 
-  return monthly.map((value) => Math.min(value, 5))
+  return Array.from({ length: 365 }, (_, index) => {
+    const date = new Date(today)
+    date.setDate(today.getDate() - (364 - index))
+    const key = date.toISOString().slice(0, 10)
+    const value = countsByDate.get(key) ?? 0
+
+    return {
+      date: key,
+      label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      value,
+      level: Math.min(Math.max(value, 0), 5),
+    }
+  })
 }
 
 function buildPlayerRecords(matchLogs) {
@@ -1666,8 +1814,8 @@ function toTeamPerspectiveCoordinates(event) {
 
   const firstHalf = isFirstHalfPeriod(event.period, event.matchSecond)
   const attackDepth = event.side === 'home'
-    ? (firstHalf ? event.normY : 1 - event.normY)
-    : (firstHalf ? 1 - event.normY : event.normY)
+    ? (firstHalf ? 1 - event.normY : event.normY)
+    : (firstHalf ? event.normY : 1 - event.normY)
 
   return {
     attackDepth: Math.max(0, Math.min(1, attackDepth)),

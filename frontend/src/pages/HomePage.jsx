@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AccentLink, Crest, MatchCard, Pitch, PlayerBadge, PlayerInlineLink, Widget } from '../components/ui'
+import { AccentLink, Crest, MatchCard, Pitch, PlayerAvatar, PlayerBadge, PlayerInlineLink, Widget } from '../components/ui'
 import { getTopRatedPlayers, getTrendingPlayers, listHomeFeatures, listMatches, listPlayers, listQuickStats, listTeams } from '../data/repository'
 
 export function HomePage() {
@@ -78,7 +78,7 @@ export function HomePage() {
           <span>Highest Rated Player</span>
           {featuredPlayer ? (
             <Link className="quick-stat-inline-link" to={`/players/${featuredPlayer.id}`}>
-              <span className="avatar-circle quick-stat-avatar">{featuredPlayer.portrait}</span>
+              <PlayerAvatar player={featuredPlayer} className="avatar-circle quick-stat-avatar" />
               <span className="quick-stat-copy">
                 <strong className="quick-stat-name-link">{featuredPlayer.name}</strong>
                 <small>{featuredPlayer.position} | {featuredPlayer.rating} OVR</small>

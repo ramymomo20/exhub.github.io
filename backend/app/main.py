@@ -178,6 +178,22 @@ PLAYER_SELECT_FIELDS = """
     p.steam_id,
     p.discord_id,
     p.display_name,
+    COALESCE(
+        (
+            SELECT profile.avatar_url
+            FROM hub_profile_overrides profile
+            WHERE profile.owner_type = 'player'
+              AND profile.owner_key = p.steam_id
+            LIMIT 1
+        ),
+        (
+            SELECT profile.avatar_url
+            FROM hub_profile_overrides profile
+            WHERE profile.owner_type = 'discord_user'
+              AND profile.owner_key = p.discord_id::text
+            LIMIT 1
+        )
+    ) AS avatar_url,
     p.primary_position,
     p.rating,
     p.atk_rating,
@@ -532,6 +548,52 @@ async def get_team(request: Request, guild_id: str):
         {player_select_from}
         WHERE current_team.team_guild_id = %s
         ORDER BY p.rating DESC, p.display_name ASC
+        """,
+        (guild_id,),
+    )
+    team["aggregate_player_stats"] = await fetch_one(
+        request,
+        """
+        SELECT
+            COUNT(DISTINCT pmd.match_stats_id) AS appearances,
+            COALESCE(SUM(pmd.goals), 0) AS goals,
+            COALESCE(SUM(pmd.assists), 0) AS assists,
+            COALESCE(SUM(pmd.second_assists), 0) AS second_assists,
+            COALESCE(SUM(pmd.shots), 0) AS shots,
+            COALESCE(SUM(pmd.shots_on_goal), 0) AS shots_on_goal,
+            COALESCE(SUM(pmd.passes_completed), 0) AS passes_completed,
+            COALESCE(SUM(pmd.passes_attempted), 0) AS passes_attempted,
+            CASE
+                WHEN COALESCE(SUM(pmd.passes_attempted), 0) > 0
+                    THEN ROUND((SUM(pmd.passes_completed)::numeric / SUM(pmd.passes_attempted)::numeric) * 100, 2)
+                ELSE 0
+            END AS pass_accuracy,
+            COALESCE(SUM(pmd.key_passes), 0) AS key_passes,
+            COALESCE(SUM(pmd.chances_created), 0) AS chances_created,
+            COALESCE(SUM(pmd.fouls), 0) AS fouls,
+            COALESCE(SUM(pmd.fouls_suffered), 0) AS fouls_suffered,
+            COALESCE(SUM(pmd.yellow_cards), 0) AS yellow_cards,
+            COALESCE(SUM(pmd.red_cards), 0) AS red_cards,
+            COALESCE(SUM(pmd.offsides), 0) AS offsides,
+            COALESCE(SUM(pmd.keeper_saves), 0) AS keeper_saves,
+            COALESCE(SUM(pmd.keeper_saves_caught), 0) AS keeper_saves_caught,
+            COALESCE(SUM(pmd.goals_conceded), 0) AS goals_conceded,
+            COALESCE(SUM(pmd.own_goals), 0) AS own_goals,
+            COALESCE(SUM(pmd.interceptions), 0) AS interceptions,
+            COALESCE(SUM(pmd.tackles), 0) AS tackles,
+            COALESCE(SUM(pmd.sliding_tackles_completed), 0) AS sliding_tackles_completed,
+            COALESCE(SUM(pmd.distance_covered), 0) AS distance_covered,
+            COALESCE(AVG(pmd.match_rating), 0) AS avg_match_rating
+        FROM hub_match_player_stats pmd
+        LEFT JOIN hub_matches m ON m.match_stats_id = pmd.match_stats_id
+        WHERE COALESCE(
+            NULLIF(pmd.team_guild_id, ''),
+            CASE
+                WHEN pmd.team_side = 'home' THEN m.home_guild_id
+                WHEN pmd.team_side = 'away' THEN m.away_guild_id
+                ELSE NULL
+            END
+        ) = %s
         """,
         (guild_id,),
     )

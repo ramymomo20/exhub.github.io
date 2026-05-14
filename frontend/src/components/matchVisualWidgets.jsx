@@ -290,7 +290,7 @@ export function ShotMapLegend({ visibleTypes, onToggle }) {
 }
 
 export function ShotZonesWidget({ match, homeTeam, awayTeam }) {
-  const zones = match.shotZoneMaps ?? buildFallbackShotZoneMaps(match, homeTeam, awayTeam)
+  const zones = match.shotZoneMaps ?? buildFallbackShotZoneMaps(homeTeam, awayTeam)
 
   return (
     <Widget title="Shot Zones" className="span-full shot-zones-visual-widget">
@@ -631,51 +631,23 @@ function buildShotZoneLayout(zones, team, summary) {
   })
 }
 
-function buildFallbackShotZoneMaps(match, homeTeam, awayTeam) {
-  const homeShots = getComparisonValue(match.comparisonStats, 'Shots', 'home')
-  const awayShots = getComparisonValue(match.comparisonStats, 'Shots', 'away')
-
+function buildFallbackShotZoneMaps(homeTeam, awayTeam) {
   return {
     home: {
       teamId: homeTeam.id,
-      shots: homeShots,
-      goals: match.homeScore,
-      conversion: toConversion(match.homeScore, homeShots),
-      zones: [
-        { id: 'zone-1', percentage: 8 },
-        { id: 'zone-2', percentage: 5 },
-        { id: 'zone-6', percentage: 7 },
-        { id: 'zone-9', percentage: 18 },
-        { id: 'zone-10', percentage: 12 },
-        { id: 'zone-11', percentage: 9 },
-        { id: 'zone-17', percentage: 16 },
-        { id: 'zone-18', percentage: 10 },
-        { id: 'zone-19', percentage: 7 },
-      ],
+      shots: 0,
+      goals: 0,
+      conversion: 0,
+      zones: [],
     },
     away: {
       teamId: awayTeam.id,
-      shots: awayShots,
-      goals: match.awayScore,
-      conversion: toConversion(match.awayScore, awayShots),
-      zones: [
-        { id: 'zone-3', percentage: 7 },
-        { id: 'zone-4', percentage: 11 },
-        { id: 'zone-5', percentage: 6 },
-        { id: 'zone-10', percentage: 14 },
-        { id: 'zone-11', percentage: 15 },
-        { id: 'zone-12', percentage: 9 },
-        { id: 'zone-18', percentage: 12 },
-        { id: 'zone-19', percentage: 10 },
-        { id: 'zone-20', percentage: 9 },
-      ],
+      shots: 0,
+      goals: 0,
+      conversion: 0,
+      zones: [],
     },
   }
-}
-
-function toConversion(goals, shots) {
-  if (!shots) return 0
-  return Math.round((goals / shots) * 100)
 }
 
 function buildHeadToHeadModel(match) {

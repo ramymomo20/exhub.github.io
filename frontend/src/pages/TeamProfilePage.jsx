@@ -1,19 +1,24 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Crest, FormPills, PageTrail, PlayerBadge, PlayerInlineLink, StatChip, Widget } from '../components/ui'
-import { getPlayerById, getTeamById, listMatchesByTeamId, listPlayersByTeamId } from '../data/repository'
+import { getPlayerById, getTeamById, listMatchesByTeamId, listPlayersByTeamId, useHubTeamDetail } from '../data/repository'
 import { getRatingToneClass } from '../utils/rating'
 
 export function TeamProfilePage() {
   const { teamId } = useParams()
+  const { loading } = useHubTeamDetail(teamId)
   const team = getTeamById(teamId)
+
+  if (!team && loading) {
+    return null
+  }
 
   if (!team) {
     return <Navigate to="/teams" replace />
   }
 
   const squad = listPlayersByTeamId(team.id)
-  const recent = listMatchesByTeamId(team.id).slice(0, 5)
-  const aggregated = buildTeamStatistics(squad)
+  const recent = (team.recentMatches?.length ? team.recentMatches : listMatchesByTeamId(team.id)).slice(0, 5)
+  const aggregated = team.aggregateStats ?? buildTeamStatistics(squad)
   const captain = getPlayerById(squad.find((player) => player.name === team.captain)?.id ?? '')
   const groupedSquad = groupSquadByUnit(squad)
   const recentCompetitions = Array.from(new Set(recent.map((match) => match.competition).filter(Boolean)))

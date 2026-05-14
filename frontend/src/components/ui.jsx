@@ -106,7 +106,7 @@ export function PlayerInlineLink({ playerId, compact = false }) {
 
   return (
     <Link className={`player-inline-link${compact ? ' is-compact' : ''}`} to={`/players/${player.id}`}>
-      <span className="avatar-circle">{player.portrait}</span>
+      <PlayerAvatar player={player} className="avatar-circle" />
       <span>{player.name}</span>
     </Link>
   )
@@ -121,7 +121,7 @@ export function PlayerBadge({ player, compact = false }) {
       </div>
 
       <Link className="player-avatar-link" to={`/players/${player.id}`}>
-        <div className="player-avatar player-avatar-small">{player.portrait}</div>
+        <PlayerAvatar player={player} className="player-avatar player-avatar-small" />
       </Link>
 
       <Link className="player-name-link" to={`/players/${player.id}`}>
@@ -139,6 +139,18 @@ export function PlayerBadge({ player, compact = false }) {
       </div>
     </article>
   )
+}
+
+export function PlayerAvatar({ player, className = '' }) {
+  if (player?.avatarUrl) {
+    return (
+      <span className={`${className} has-image`.trim()}>
+        <img src={player.avatarUrl} alt="" loading="lazy" />
+      </span>
+    )
+  }
+
+  return <span className={className}>{player?.portrait ?? '?'}</span>
 }
 
 export function TeamCard({ team }) {
